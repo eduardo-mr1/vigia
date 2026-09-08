@@ -1,0 +1,90 @@
+name: 'Vigía'
+description: 'Detecta pruebas que pasan sin verificar nada y lo comenta en el Pull Request.'
+author: 'Eduardo Maytorena'
+
+branding:
+  icon: 'eye'
+  color: 'blue'
+
+inputs:
+  ruta:
+    description: 'Directorio a analizar cuando no se limita a los archivos del PR.'
+    required: false
+    default: '.'
+  solo-cambios:
+    description: 'Analizar únicamente los archivos de prueba que toca el PR.'
+    required: false
+    default: 'true'
+  codigo-fuente:
+    description: 'Raíz del código fuente. Habilita la detección de aserciones negativas huérfanas.'
+    required: false
+    default: ''
+  fallar-en-p1:
+    description: 'Terminar el job con error si hay hallazgos P1.'
+    required: false
+    default: 'true'
+  comentar:
+    description: 'Publicar el resultado como comentario en el PR.'
+    required: false
+    default: 'true'
+
+outputs:
+  hallazgos:
+    description: 'Número total de hallazgos.'
+    value: ${{ steps.analizar.outputs.hallazgos }}
+  p1:
+    description: 'Número de hallazgos P1.'
+    value: ${{ steps.analizar.outputs.p1 }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Determinar archivos a analizar
+      id: archivos
+      shell: bash
+      run: |
+        if [ "${{ inputs.solo-cambios }}" = "true" ] && [ -n "$GITHUB_BASE_REF" ]; then
+          git fetch --depth=1 origin "$GITHUB_BASE_REF"
+          CAMBIOS=$(git diff --name-only --diff-filter=d "origin/$GITHUB_BASE_REF"...HEAD | grep -E '\.(test|spec)\.(ts|tsx|js|jsx)$|\.ya?ml$' || true)
+          echo "lista<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$CAMBIOS" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+        else
+          echo "lista=" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Analizar
+      id: analizar
+      shell: bash
+      run: |
+        LISTA="${{ steps.archivos.outputs.lista }}"
+        SRC=""
+        if [ -n "${{ inputs.codigo-fuente }}" ]; then SRC="--src ${{ inputs.codigo-fuente }}"; fi
+
+        if [ -n "$LISTA" ]; then
+          node "${{ github.action_path }}/dist/cli.js" --format markdown $SRC --files $LISTA > vigia-reporte.md || true
+        else
+          node "${{ github.action_path }}/dist/cli.js" "${{ inputs.ruta }}" $SRC --format markdown > vigia-reporte.md || true
+        fi
+        cat vigia-reporte.md
+
+    - name: Comentar en el PR
+      if: inputs.comentar == 'true' && github.event_name == 'pull_request'
+      uses: marocchino/sticky-pull-request-comment@v2
+      with:
+        header: vigia
+        path: vigia-reporte.md
+
+    - name: Fallar si hay P1
+      if: inputs.fallar-en-p1 == 'true'
+      shell: bash
+      run: |
+        LISTA="${{ steps.archivos.outputs.lista }}"
+        SRC=""
+        if [ -n "${{ inputs.codigo-fuente }}" ]; then SRC="--src ${{ inputs.codigo-fuente }}"; fi
+
+        if [ -n "$LISTA" ]; then
+          node "${{ github.action_path }}/dist/cli.js" $SRC --files $LISTA
+        else
+          node "${{ github.action_path }}/dist/cli.js" "${{ inputs.ruta }}" $SRC
+        fi
