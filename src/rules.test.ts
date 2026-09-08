@@ -281,3 +281,103 @@ describe('missingAwait', () => {
     ).toEqual([]);
   });
 });
+
+describe('missingAwait en Playwright', () => {
+  const IMPORT = `import { expect, test } from '@playwright/test';\n`;
+
+  it.each([
+    `expect(page.locator('#boton')).toBeVisible();`,
+    `expect(page.getByRole('button')).toBeEnabled();`,
+    `expect(page.getByTestId('total')).toHaveText('$0.00');`,
+    `expect(page.locator('.fila')).toHaveCount(3);`,
+    `expect(page).toHaveURL('/inicio');`,
+  ])('detecta %s sin await', (assertion) => {
+    const result = findings(
+      `${IMPORT}test('a', async ({ page }) => { ${assertion} });`,
+      [missingAwait],
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0]?.rule).toBe('await-faltante');
+  });
+
+  it('acepta la versión con await', () => {
+    expect(
+      findings(
+        `${IMPORT}test('a', async ({ page }) => { await expect(page.locator('#x')).toBeVisible(); });`,
+        [missingAwait],
+      ),
+    ).toEqual([]);
+  });
+
+  it('acepta una aserción negada con await', () => {
+    expect(
+      findings(
+        `${IMPORT}test('a', async ({ page }) => { await expect(page.locator('#x')).not.toBeVisible(); });`,
+        [missingAwait],
+      ),
+    ).toEqual([]);
+  });
+
+  // Sin el import de Playwright, toBeVisible es el matcher sincrono de
+  // jest-dom o de React Native Testing Library: exigir await seria un falso
+  // positivo.
+  it('no marca toBeVisible en un archivo que no usa Playwright', () => {
+    expect(
+      findings(`it('a', () => { expect(getByTestId('x')).toBeVisible(); });`, [
+        missingAwait,
+      ]),
+    ).toEqual([]);
+  });
+
+  it('sigue detectando .rejects en un archivo de Playwright', () => {
+    expect(
+      findings(`${IMPORT}test('a', async () => { expect(f()).rejects.toThrow(); });`, [
+        missingAwait,
+      ]),
+    ).toHaveLength(1);
+  });
+
+  it('reconoce el import con subruta de Playwright', () => {
+    expect(
+      findings(
+        `import { expect } from '@playwright/test/index';\ntest('a', async ({ page }) => { expect(page.locator('#x')).toBeVisible(); });`,
+        [missingAwait],
+      ),
+    ).toHaveLength(1);
+  });
+});
+
+describe('noAssertion con otras formas de aserción', () => {
+  // Cypress asierta con .should(), no con expect. Sin reconocerlo, toda prueba
+  // de Cypress se reportaria como defectuosa.
+  it('acepta una prueba de Cypress con should', () => {
+    expect(
+      findings(`it('a', () => { cy.get('#total').should('have.text', '$0.00'); });`, [
+        noAssertion,
+      ]),
+    ).toEqual([]);
+  });
+
+  it('acepta el encadenado con and', () => {
+    expect(
+      findings(`it('a', () => { cy.get('#x').should('exist').and('be.visible'); });`, [
+        noAssertion,
+      ]),
+    ).toEqual([]);
+  });
+
+  it('acepta assert de Chai', () => {
+    expect(
+      findings(`it('a', () => { assert.equal(sumar(1, 1), 2); });`, [noAssertion]),
+    ).toEqual([]);
+  });
+
+  // Una prueba de Cypress que solo hace acciones sigue sin verificar nada.
+  it('detecta una prueba de Cypress sin ninguna aserción', () => {
+    expect(
+      findings(`it('a', () => { cy.visit('/'); cy.get('#boton').click(); });`, [
+        noAssertion,
+      ]),
+    ).toHaveLength(1);
+  });
+});

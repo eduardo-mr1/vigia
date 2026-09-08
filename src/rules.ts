@@ -91,15 +91,41 @@ function walk(node: ts.Node, visit: (node: ts.Node) => void): void {
   node.forEachChild((child) => walk(child, visit));
 }
 
-/** ¿El nodo contiene al menos una llamada a `expect`? */
-function containsExpect(node: ts.Node): boolean {
+/**
+ * Formas de aserción reconocidas, más allá de `expect`.
+ *
+ * Cypress asierta con `.should()` y `.and()`; Chai también ofrece `assert.*`.
+ * Sin esto, toda prueba de Cypress se reportaría como "sin aserción": un falso
+ * positivo que haría inservible la herramienta en esos proyectos.
+ */
+const ASSERTION_METHODS = new Set(['should', 'and']);
+
+/** ¿El nodo contiene al menos una aserción, en cualquiera de sus formas? */
+function containsAssertion(node: ts.Node): boolean {
   let found = false;
+
   walk(node, (current) => {
-    if (found) return;
-    if (ts.isCallExpression(current) && calleeName(current.expression) === 'expect') {
+    if (found || !ts.isCallExpression(current)) return;
+
+    const callee = current.expression;
+    if (calleeName(callee) === 'expect') {
       found = true;
+      return;
+    }
+
+    if (ts.isPropertyAccessExpression(callee)) {
+      // .should(...) / .and(...) de Cypress
+      if (ASSERTION_METHODS.has(callee.name.text)) {
+        found = true;
+        return;
+      }
+      // assert.equal(...) y demás de Chai
+      if (ts.isIdentifier(callee.expression) && callee.expression.text === 'assert') {
+        found = true;
+      }
     }
   });
+
   return found;
 }
 
@@ -112,7 +138,7 @@ export const noAssertion: Rule = (context) => {
   walk(context.source, (node) => {
     if (!isTestCall(node)) return;
     const body = bodyOf(node);
-    if (!body || containsExpect(body)) return;
+    if (!body || containsAssertion(body)) return;
 
     findings.push(
       finding(
@@ -270,11 +296,12 @@ export const focusedTest: Rule = (context) => {
  */
 export const missingAwait: Rule = (context) => {
   const findings: Finding[] = [];
+  const playwright = usesPlaywright(context.source);
 
   walk(context.source, (node) => {
     if (!ts.isExpressionStatement(node)) return;
 
-    const asyncExpect = findAsyncExpect(node.expression);
+    const asyncExpect = findAsyncExpect(node.expression, playwright);
     if (asyncExpect === null) return;
 
     findings.push(
@@ -284,7 +311,7 @@ export const missingAwait: Rule = (context) => {
         'await-faltante',
         'P1',
         `expect(...).${asyncExpect} sin await: la prueba termina antes de comprobar nada.`,
-        `Antepón await, o devuelve la expresión con return.`,
+        'Antepón await, o devuelve la expresión con return.',
       ),
     );
   });
@@ -295,20 +322,69 @@ export const missingAwait: Rule = (context) => {
 const ASYNC_MODIFIERS = new Set(['resolves', 'rejects']);
 
 /**
+ * Matchers de Playwright que esperan al elemento y devuelven una promesa.
+ *
+ * En Playwright TODA aserción sobre un locator es asíncrona: reintenta hasta
+ * que se cumple o se agota el tiempo. Sin `await`, la aserción se descarta y
+ * la prueba pasa sin haber comprobado nada — el mismo defecto que con
+ * `.rejects`, pero mucho más frecuente porque la línea se ve completa.
+ */
+const PLAYWRIGHT_MATCHERS = new Set([
+  'toBeVisible',
+  'toBeHidden',
+  'toBeEnabled',
+  'toBeDisabled',
+  'toBeChecked',
+  'toBeEditable',
+  'toBeEmpty',
+  'toBeFocused',
+  'toBeAttached',
+  'toBeInViewport',
+  'toContainText',
+  'toHaveText',
+  'toHaveValue',
+  'toHaveValues',
+  'toHaveAttribute',
+  'toHaveClass',
+  'toHaveCount',
+  'toHaveCSS',
+  'toHaveId',
+  'toHaveJSProperty',
+  'toHaveScreenshot',
+  'toHaveTitle',
+  'toHaveURL',
+  'toBeOK',
+]);
+
+/** ¿El archivo importa Playwright? Solo entonces sus matchers son asíncronos. */
+function usesPlaywright(source: ts.SourceFile): boolean {
+  return source.statements.some(
+    (statement) =>
+      ts.isImportDeclaration(statement) &&
+      ts.isStringLiteralLike(statement.moduleSpecifier) &&
+      statement.moduleSpecifier.text.includes('@playwright/'),
+  );
+}
+
+/**
  * Devuelve el modificador asíncrono (`resolves` / `rejects`) de una expresión
  * que arranca en `expect(...)`, o null si no es esa forma.
  *
  * Solo se inspecciona la expresión desnuda: si el nodo fuera `await ...` o
  * `return ...`, no sería un ExpressionStatement con esta forma.
  */
-function findAsyncExpect(expression: ts.Expression): string | null {
+function findAsyncExpect(expression: ts.Expression, playwright: boolean): string | null {
   let current: ts.Node = expression;
   let modifier: string | null = null;
 
   // Se recorre la cadena hacia la raíz: expect(x).rejects.toThrow()
   while (ts.isCallExpression(current) || ts.isPropertyAccessExpression(current)) {
     if (ts.isPropertyAccessExpression(current)) {
-      if (ASYNC_MODIFIERS.has(current.name.text)) modifier = current.name.text;
+      const name = current.name.text;
+      if (ASYNC_MODIFIERS.has(name)) modifier = name;
+      else if (playwright && modifier === null && PLAYWRIGHT_MATCHERS.has(name)) {
+        modifier = name;
+      }
       current = current.expression;
     } else {
       current = current.expression;

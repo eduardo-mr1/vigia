@@ -5,7 +5,7 @@ Request.
 
 [![CI](https://github.com/eduardo-mr1/vigia/actions/workflows/ci.yml/badge.svg)](https://github.com/eduardo-mr1/vigia/actions/workflows/ci.yml)
 [![Cobertura](https://img.shields.io/badge/cobertura-99.6%25%20líneas-brightgreen)](#calidad)
-[![Tests](https://img.shields.io/badge/tests-115%20passing-brightgreen)](./src)
+[![Tests](https://img.shields.io/badge/tests-129%20passing-brightgreen)](./src)
 [![Licencia](https://img.shields.io/badge/licencia-MIT-blue)](./LICENSE)
 
 ---
@@ -42,6 +42,24 @@ en verde, dando confianza sobre el defecto más importante del sistema.
 
 ---
 
+## Marcos soportados
+
+| Marco | Cómo se detecta |
+|---|---|
+| Jest / Vitest | `it`, `test`, `describe`, `expect` |
+| React Native Testing Library | `queryByTestId` en aserciones negativas |
+| Playwright | Matchers asíncronos, activados por el import |
+| Cypress | `.should()` y `.and()` cuentan como aserción |
+| Chai | `assert.*` cuenta como aserción |
+| Maestro | Flujos YAML, para aserciones negativas huérfanas |
+
+Reconocer las aserciones de Cypress no es un extra: sin ello, **toda** prueba
+de Cypress se reportaría como "sin aserción", porque ahí no se usa `expect`.
+Una herramienta de calidad que se equivoca en un marco entero no se usa en
+ninguno.
+
+---
+
 ## Qué detecta
 
 | Regla | Severidad | Qué encuentra |
@@ -50,7 +68,7 @@ en verde, dando confianza sobre el defecto más importante del sistema.
 | `expect-sin-matcher` | P1 | `expect(x)` sin matcher encadenado |
 | `tautologia` | P1 | `expect(true).toBe(true)` y equivalentes |
 | `prueba-enfocada` | P1 | `.only`, que silencia el resto de la suite en CI |
-| `await-faltante` | P1 | `expect(p).rejects.toThrow()` sin `await`: la prueba acaba antes |
+| `await-faltante` | P1 | Aserción asíncrona sin `await` — incluidos los matchers de Playwright |
 | `prueba-omitida` | P3 | `.skip`, `xit`, `.todo` — cobertura que no existe |
 | `assercion-negativa-huerfana` | P1 / P2 | Aserción negativa sobre un identificador que el código nunca produce |
 
@@ -205,7 +223,7 @@ soporta su propio criterio, no tiene por qué imponérselo a nadie.
 
 | | |
 |---|---|
-| Pruebas | 115 |
+| Pruebas | 129 |
 | Cobertura | 99.6% de líneas, 88% de ramas |
 | Dependencias de runtime | 0 |
 | Lint | ESLint estricto, cero advertencias permitidas |
@@ -239,6 +257,23 @@ porque la línea parece completa. Vigía sigue la cadena hasta la raíz: si el
 `expect` lleva `.resolves` o `.rejects` y la expresión no está esperada ni
 devuelta, la marca.
 
+### En Playwright es aún peor
+
+```ts
+test('el botón aparece', async ({ page }) => {
+  expect(page.locator('#guardar')).toBeVisible();   // sin await
+});
+```
+
+En Playwright **toda** aserción sobre un locator es asíncrona: reintenta hasta
+cumplirse o agotar el tiempo. Sin `await` la aserción se descarta entera. La
+línea se ve idéntica a una síncrona, y por eso se cuela tanto.
+
+Vigía activa los 24 matchers de Playwright solo cuando el archivo importa
+`@playwright/test`. Sin ese import, `toBeVisible` es el matcher síncrono de
+jest-dom o de React Native Testing Library, y exigir `await` sería un falso
+positivo. Ambos casos tienen prueba.
+
 ---
 
 ## Estado
@@ -248,7 +283,8 @@ Siete reglas funcionando y probadas. En el roadmap:
 - **Mapa de casos afectados** — qué casos del plan de pruebas toca cada PR
 - **Delta de cobertura** contra la rama base
 - **Pruebas idénticas** — dos casos con distinto nombre y el mismo cuerpo
-- **Soporte Playwright y Cypress** — mismas ideas, otras APIs
+- **`cy.get()` sin aserción en la cadena** — acciones sin verificación
+- **Publicación en npm** — para que `npx vigia` funcione sin clonar el repo
 
 ---
 
