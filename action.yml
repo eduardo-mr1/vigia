@@ -39,6 +39,18 @@ outputs:
 runs:
   using: 'composite'
   steps:
+    # dist/ no se versiona: es un artefacto. La accion lo compila la primera
+    # vez que se usa, dentro de su propio directorio, sin tocar el repo que la
+    # invoca. Cuesta unos segundos y evita commitear codigo generado.
+    - name: Preparar Vigía
+      shell: bash
+      run: |
+        if [ ! -f "${{ github.action_path }}/dist/cli.js" ]; then
+          cd "${{ github.action_path }}"
+          npm ci --ignore-scripts
+          npm run build
+        fi
+
     - name: Determinar archivos a analizar
       id: archivos
       shell: bash

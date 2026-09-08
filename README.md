@@ -146,6 +146,10 @@ jobs:
 Comenta en el PR con los hallazgos de los archivos que ese PR toca, y actualiza
 el mismo comentario en cada push en lugar de acumular uno por commit.
 
+`dist/` no se versiona: la Action lo compila la primera vez que se usa, dentro
+de su propio directorio. Cuesta unos segundos y evita meter código generado en
+el historial.
+
 | Entrada | Por defecto | Para qué |
 |---|---|---|
 | `ruta` | `.` | Directorio a analizar cuando no se limita al PR |
