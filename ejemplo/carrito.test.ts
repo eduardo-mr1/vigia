@@ -1,7 +1,7 @@
 /**
  * Suite de ejemplo con los defectos que Vigía detecta.
  *
- * Los cinco pasan en verde en Jest. Ninguno verifica nada.
+ * Los seis pasan en verde en Jest. Ninguno verifica nada.
  */
 
 describe('carrito', () => {
@@ -25,9 +25,15 @@ describe('carrito', () => {
   it.only('suma con impuestos', () => {
     expect(conImpuestos(100)).toBe(116);
   });
+
+  it('rechaza un cupón inexistente', async () => {
+    // Sin await: la promesa se resuelve despues de que la prueba termino.
+    expect(buscarCupon('NO-EXISTE')).rejects.toThrow();
+  });
 });
 
 declare function sumar(valores: number[]): number;
 declare function aplicarDescuento(monto: number, pct: number): number;
 declare function validarCupon(codigo: string): boolean;
 declare function conImpuestos(monto: number): number;
+declare function buscarCupon(codigo: string): Promise<unknown>;

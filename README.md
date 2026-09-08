@@ -5,7 +5,7 @@ Request.
 
 [![CI](https://github.com/eduardo-mr1/vigia/actions/workflows/ci.yml/badge.svg)](https://github.com/eduardo-mr1/vigia/actions/workflows/ci.yml)
 [![Cobertura](https://img.shields.io/badge/cobertura-99.6%25%20líneas-brightgreen)](#calidad)
-[![Tests](https://img.shields.io/badge/tests-104%20passing-brightgreen)](./src)
+[![Tests](https://img.shields.io/badge/tests-115%20passing-brightgreen)](./src)
 [![Licencia](https://img.shields.io/badge/licencia-MIT-blue)](./LICENSE)
 
 ---
@@ -25,10 +25,14 @@ it('el carrito existe', () => {
   expect(true).toBe(true);   // comprueba JavaScript, no tu código
 });
 
+it('rechaza credenciales inválidas', async () => {
+  expect(login('malo')).rejects.toThrow();   // sin await: la prueba ya terminó
+});
+
 it.only('suma con impuestos', () => { /* ... */ });  // silencia el resto de la suite
 ```
 
-Jest reporta las tres como aprobadas. La cobertura ni siquiera baja: el código
+Jest reporta las cuatro como aprobadas. La cobertura ni siquiera baja: el código
 **sí** se ejecutó, simplemente nadie miró el resultado.
 
 Este proyecto nació de un caso real: una prueba E2E que hacía
@@ -46,6 +50,7 @@ en verde, dando confianza sobre el defecto más importante del sistema.
 | `expect-sin-matcher` | P1 | `expect(x)` sin matcher encadenado |
 | `tautologia` | P1 | `expect(true).toBe(true)` y equivalentes |
 | `prueba-enfocada` | P1 | `.only`, que silencia el resto de la suite en CI |
+| `await-faltante` | P1 | `expect(p).rejects.toThrow()` sin `await`: la prueba acaba antes |
 | `prueba-omitida` | P3 | `.skip`, `xit`, `.todo` — cobertura que no existe |
 | `assercion-negativa-huerfana` | P1 / P2 | Aserción negativa sobre un identificador que el código nunca produce |
 
@@ -146,10 +151,6 @@ jobs:
 Comenta en el PR con los hallazgos de los archivos que ese PR toca, y actualiza
 el mismo comentario en cada push en lugar de acumular uno por commit.
 
-`dist/` no se versiona: la Action lo compila la primera vez que se usa, dentro
-de su propio directorio. Cuesta unos segundos y evita meter código generado en
-el historial.
-
 | Entrada | Por defecto | Para qué |
 |---|---|---|
 | `ruta` | `.` | Directorio a analizar cuando no se limita al PR |
@@ -204,7 +205,7 @@ soporta su propio criterio, no tiene por qué imponérselo a nadie.
 
 | | |
 |---|---|
-| Pruebas | 104 |
+| Pruebas | 115 |
 | Cobertura | 99.6% de líneas, 88% de ramas |
 | Dependencias de runtime | 0 |
 | Lint | ESLint estricto, cero advertencias permitidas |
@@ -220,14 +221,34 @@ npm run build
 
 ---
 
+## El `await` que falta
+
+```ts
+it('rechaza credenciales inválidas', async () => {
+  expect(login('malo', 'malo')).rejects.toThrow();
+});
+```
+
+`expect(...).rejects` devuelve una promesa. Sin `await` ni `return`, la prueba
+termina antes de que se resuelva: el fallo se pierde, o aparece más tarde
+atribuido a otro caso. Jest a veces avisa y a veces no, según la versión y
+según si otra prueba absorbe el rechazo.
+
+Es el defecto más común en suites asíncronas y el más difícil de ver leyendo,
+porque la línea parece completa. Vigía sigue la cadena hasta la raíz: si el
+`expect` lleva `.resolves` o `.rejects` y la expresión no está esperada ni
+devuelta, la marca.
+
+---
+
 ## Estado
 
-Seis reglas funcionando y probadas, incluida la de aserciones huérfanas. En el
-roadmap:
+Siete reglas funcionando y probadas. En el roadmap:
 
 - **Mapa de casos afectados** — qué casos del plan de pruebas toca cada PR
 - **Delta de cobertura** contra la rama base
 - **Pruebas idénticas** — dos casos con distinto nombre y el mismo cuerpo
+- **Soporte Playwright y Cypress** — mismas ideas, otras APIs
 
 ---
 

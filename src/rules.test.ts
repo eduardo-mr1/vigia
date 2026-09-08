@@ -2,6 +2,7 @@ import { analyzeSource } from './analyze';
 import {
   expectWithoutMatcher,
   focusedTest,
+  missingAwait,
   noAssertion,
   skippedTest,
   tautology,
@@ -209,5 +210,74 @@ describe('formas poco comunes de declarar pruebas', () => {
   it('detecta el título ausente sin romperse', () => {
     const result = findings(`it(nombreDinamico, () => {});`, [noAssertion]);
     expect(result[0]?.message).toContain('(sin título)');
+  });
+});
+
+describe('missingAwait', () => {
+  // El defecto: la promesa se resuelve despues de que la prueba termino, y el
+  // fallo se pierde o se atribuye a otro caso.
+  it.each([
+    `expect(login('malo')).rejects.toThrow();`,
+    `expect(cargar()).resolves.toBe(1);`,
+    `expect(f()).rejects.toThrowError('x');`,
+    `expect(f()).resolves.toEqual({ a: 1 });`,
+  ])('detecta %s sin await', (assertion) => {
+    const result = findings(`it('a', async () => { ${assertion} });`, [missingAwait]);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.rule).toBe('await-faltante');
+    expect(result[0]?.severity).toBe('P1');
+  });
+
+  it('acepta la versión con await', () => {
+    expect(
+      findings(`it('a', async () => { await expect(f()).rejects.toThrow(); });`, [
+        missingAwait,
+      ]),
+    ).toEqual([]);
+  });
+
+  it('acepta la versión con return', () => {
+    expect(
+      findings(`it('a', () => { return expect(f()).rejects.toThrow(); });`, [missingAwait]),
+    ).toEqual([]);
+  });
+
+  it('acepta una aserción síncrona sin await', () => {
+    expect(
+      findings(`it('a', () => { expect(sumar(1, 1)).toBe(2); });`, [missingAwait]),
+    ).toEqual([]);
+  });
+
+  it('no marca una promesa asignada a una variable', () => {
+    // Aqui la promesa se guarda, presumiblemente para esperarla despues.
+    expect(
+      findings(`it('a', async () => { const p = expect(f()).rejects.toThrow(); await p; });`, [
+        missingAwait,
+      ]),
+    ).toEqual([]);
+  });
+
+  it('nombra el modificador en el mensaje', () => {
+    const result = findings(`it('a', async () => { expect(f()).rejects.toThrow(); });`, [
+      missingAwait,
+    ]);
+    expect(result[0]?.message).toContain('rejects');
+  });
+
+  it('detecta varias en la misma prueba', () => {
+    const result = findings(
+      `it('a', async () => {
+         expect(f()).rejects.toThrow();
+         expect(g()).resolves.toBe(1);
+       });`,
+      [missingAwait],
+    );
+    expect(result).toHaveLength(2);
+  });
+
+  it('no marca un expect sin modificador asíncrono', () => {
+    expect(
+      findings(`it('a', () => { expect(obj).toHaveProperty('rejects'); });`, [missingAwait]),
+    ).toEqual([]);
   });
 });

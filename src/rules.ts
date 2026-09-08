@@ -255,10 +255,75 @@ export const focusedTest: Rule = (context) => {
   return findings;
 };
 
+
+
+/**
+ * Una aserción asíncrona sin `await` no se comprueba.
+ *
+ * `expect(promesa).rejects.toThrow()` devuelve una promesa. Sin `await` ni
+ * `return`, la prueba termina antes de que se resuelva y el fallo se pierde —
+ * o peor, aparece en otra prueba, atribuido al caso equivocado.
+ *
+ * Es el defecto más común en suites asíncronas y el más difícil de ver leyendo:
+ * la línea parece completa. Jest a veces avisa y a veces no, según la versión
+ * y según si otra prueba absorbe el rechazo.
+ */
+export const missingAwait: Rule = (context) => {
+  const findings: Finding[] = [];
+
+  walk(context.source, (node) => {
+    if (!ts.isExpressionStatement(node)) return;
+
+    const asyncExpect = findAsyncExpect(node.expression);
+    if (asyncExpect === null) return;
+
+    findings.push(
+      finding(
+        context,
+        node,
+        'await-faltante',
+        'P1',
+        `expect(...).${asyncExpect} sin await: la prueba termina antes de comprobar nada.`,
+        `Antepón await, o devuelve la expresión con return.`,
+      ),
+    );
+  });
+
+  return findings;
+};
+
+const ASYNC_MODIFIERS = new Set(['resolves', 'rejects']);
+
+/**
+ * Devuelve el modificador asíncrono (`resolves` / `rejects`) de una expresión
+ * que arranca en `expect(...)`, o null si no es esa forma.
+ *
+ * Solo se inspecciona la expresión desnuda: si el nodo fuera `await ...` o
+ * `return ...`, no sería un ExpressionStatement con esta forma.
+ */
+function findAsyncExpect(expression: ts.Expression): string | null {
+  let current: ts.Node = expression;
+  let modifier: string | null = null;
+
+  // Se recorre la cadena hacia la raíz: expect(x).rejects.toThrow()
+  while (ts.isCallExpression(current) || ts.isPropertyAccessExpression(current)) {
+    if (ts.isPropertyAccessExpression(current)) {
+      if (ASYNC_MODIFIERS.has(current.name.text)) modifier = current.name.text;
+      current = current.expression;
+    } else {
+      current = current.expression;
+    }
+  }
+
+  if (modifier === null) return null;
+  return ts.isIdentifier(current) && current.text === 'expect' ? modifier : null;
+}
+
 export const rules: readonly Rule[] = [
   noAssertion,
   expectWithoutMatcher,
   tautology,
   skippedTest,
   focusedTest,
+  missingAwait,
 ];
