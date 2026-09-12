@@ -1,298 +1,145 @@
 # Vigía
 
-Detecta pruebas que **pasan sin verificar nada**, y lo comenta en cada Pull
-Request.
+**A GitHub Action that flags tests which pass without verifying anything.**
 
-[![CI](https://github.com/eduardo-mr1/vigia/actions/workflows/ci.yml/badge.svg)](https://github.com/eduardo-mr1/vigia/actions/workflows/ci.yml)
-[![Cobertura](https://img.shields.io/badge/cobertura-99.6%25%20líneas-brightgreen)](#calidad)
-[![Tests](https://img.shields.io/badge/tests-129%20passing-brightgreen)](./src)
-[![Licencia](https://img.shields.io/badge/licencia-MIT-blue)](./LICENSE)
+A green suite is not the same as a tested codebase. Vigía reads the tests changed in a pull request, finds the ones that can never fail, and comments on the exact lines — before the branch merges and the false confidence becomes permanent.
+
+<!-- TODO: badges. Replace OWNER/REPO and remove the ones you don't use.
+[![CI](https://github.com/eduardo-mr1/vigia/actions/workflows/ci.yml/badge.svg)](https://github.com/eduardo-mr1/vigia/actions)
+[![Marketplace](https://img.shields.io/badge/marketplace-vig%C3%ADa-blue?logo=github)](https://github.com/marketplace/actions/vigia)
+![License](https://img.shields.io/badge/license-MIT-green)
+-->
 
 ---
 
-## El problema
+## The problem
 
-Una suite en verde no significa que el código funcione. Significa que ninguna
-prueba falló, y una prueba que **no puede fallar** nunca lo hará.
+Every team has this test:
 
-```ts
-it('calcula el total', () => {
-  const total = sumar([10, 20]);
-  // sin expect: pasa aunque sumar() devuelva basura
-});
-
-it('el carrito existe', () => {
-  expect(true).toBe(true);   // comprueba JavaScript, no tu código
-});
-
-it('rechaza credenciales inválidas', async () => {
-  expect(login('malo')).rejects.toThrow();   // sin await: la prueba ya terminó
-});
-
-it.only('suma con impuestos', () => { /* ... */ });  // silencia el resto de la suite
+```js
+it('creates the order', async () => {
+  const order = await createOrder(payload)
+  // ...and nothing else
+})
 ```
 
-Jest reporta las cuatro como aprobadas. La cobertura ni siquiera baja: el código
-**sí** se ejecutó, simplemente nadie miró el resultado.
+It runs. It passes. It goes green on every commit for two years. It verifies nothing.
 
-Este proyecto nació de un caso real: una prueba E2E que hacía
-`assertNotVisible` sobre un identificador que la app nunca generaba. Una
-aserción negativa sobre algo que no puede existir pasa siempre. Llevaba semanas
-en verde, dando confianza sobre el defecto más importante del sistema.
+Coverage tools won't catch it — the line *was* executed. Code review won't catch it either, because reviewers read the diff for what it says, not for what it forgot to say. So the suite grows, the number goes up, and the confidence it buys is partly fictional.
+
+Vigía is the check for that specific blind spot.
 
 ---
 
-## Marcos soportados
+## Demo
 
-| Marco | Cómo se detecta |
+<!-- TODO: record a 10-15s GIF of Vigía commenting on a real PR and drop it here.
+     Suggested capture: open a PR that adds an assertion-free test → the Action runs →
+     the comment appears inline on the offending line. Nothing else in frame.
+     Tools: macOS screen recording + gifski, or Kap. Keep it under 3 MB or GitHub lazy-loads it.
+     Put the file in docs/demo.gif -->
+
+![Vigía commenting on a pull request](docs/demo.gif)
+
+---
+
+## What it detects
+
+<!-- TODO: trim this list to what Vigía actually implements today. Delete the rest —
+     an honest short list reads better than an aspirational long one. -->
+
+| Pattern | Example |
 |---|---|
-| Jest / Vitest | `it`, `test`, `describe`, `expect` |
-| React Native Testing Library | `queryByTestId` en aserciones negativas |
-| Playwright | Matchers asíncronos, activados por el import |
-| Cypress | `.should()` y `.and()` cuentan como aserción |
-| Chai | `assert.*` cuenta como aserción |
-| Maestro | Flujos YAML, para aserciones negativas huérfanas |
-
-Reconocer las aserciones de Cypress no es un extra: sin ello, **toda** prueba
-de Cypress se reportaría como "sin aserción", porque ahí no se usa `expect`.
-Una herramienta de calidad que se equivoca en un marco entero no se usa en
-ninguno.
+| **No assertion at all** | A test body that never calls an assertion |
+| **Tautological assertion** | `expect(true).toBe(true)`, `assert(1 === 1)` |
+| **Unawaited async assertion** | `expect(promise).resolves.toBe(x)` with no `await` — resolves after the test ends |
+| **Empty body** | `it('does the thing', () => {})` |
+| **Permanently skipped** | `it.skip` / `xit` left behind past its TODO |
 
 ---
 
-## Qué detecta
+## Usage
 
-| Regla | Severidad | Qué encuentra |
-|---|---|---|
-| `sin-assercion` | P1 | Una prueba sin un solo `expect` |
-| `expect-sin-matcher` | P1 | `expect(x)` sin matcher encadenado |
-| `tautologia` | P1 | `expect(true).toBe(true)` y equivalentes |
-| `prueba-enfocada` | P1 | `.only`, que silencia el resto de la suite en CI |
-| `await-faltante` | P1 | Aserción asíncrona sin `await` — incluidos los matchers de Playwright |
-| `prueba-omitida` | P3 | `.skip`, `xit`, `.todo` — cobertura que no existe |
-| `assercion-negativa-huerfana` | P1 / P2 | Aserción negativa sobre un identificador que el código nunca produce |
-
-Solo los **P1** rompen el build. Un P3 informa; hacerlo bloqueante enseña a
-ignorar la herramienta.
-
----
-
-## La aserción negativa huérfana
-
-Es la regla que originó el proyecto, y la que ninguna otra herramienta hace.
+Add one step to your workflow:
 
 ```yaml
-- assertNotVisible:
-    id: "gasto-monto-9999-duplicado"   # este id no existe en la app
-```
-
-Pasa siempre. No porque el gasto no se duplique, sino porque ese elemento no
-puede existir en ningún estado. La prueba está en verde y no comprueba nada.
-
-Vigía cruza dos lados: qué identificadores puede producir el código fuente
-(`testID="..."` y los construidos con `testID={\`gasto-${index}\`}`), y cuáles
-esperan las pruebas. Lo que solo aparece en las pruebas es sospechoso.
-
-La coincidencia por prefijo es ambigua a propósito, así que hay dos niveles:
-
-| Situación | Severidad |
-|---|---|
-| El identificador no aparece por ningún lado | **P1** — la aserción pasa siempre |
-| Coincide con un prefijo construido, pero el sufijo no parece un valor de interpolación | **P2** — sospechoso, revísalo |
-
-`gasto-monto-9999-duplicado` cae en el segundo caso: el prefijo `gasto-monto-`
-sí existe, pero `9999-duplicado` no es lo que produce un `${index}`. Reportarlo
-como certeza sería mentir; callarlo, dejar pasar el bug.
-
-Requiere indicar dónde está el código fuente:
-
-```bash
-npx vigia .maestro --src ./app
-```
-
-Sin `--src` la regla no se aplica: sin saber qué identificadores existen,
-cualquier hallazgo sería una suposición.
-
----
-
-## En acción
-
-```bash
-$ npx vigia src --src ./app
-```
-
-```
-src/carrito.test.ts:8:3   P1  sin-assercion       La prueba "calcula el total" no contiene ninguna aserción.
-src/carrito.test.ts:14:5  P1  expect-sin-matcher  expect() sin matcher encadenado.
-src/carrito.test.ts:18:5  P1  tautologia          expect(true) comparado consigo mismo.
-src/carrito.test.ts:21:3  P3  prueba-omitida      "valida el cupón vencido" está omitida.
-src/carrito.test.ts:25:3  P1  prueba-enfocada     "suma con impuestos" usa .only: el resto no se ejecuta.
-
-5 hallazgo(s): 4 P1, 0 P2, 1 P3
-```
-
-Cada hallazgo trae archivo, línea y columna: un clic desde el editor. Y una
-sugerencia concreta — un hallazgo sin salida es solo un reproche.
-
-Prueba tú mismo con el ejemplo incluido:
-
-```bash
-npm run build && node dist/cli.js ejemplo
-```
-
----
-
-## Uso como GitHub Action
-
-```yaml
-name: Calidad de pruebas
-
+# .github/workflows/vigia.yml
+name: Vigía
 on: pull_request
 
-permissions:
-  contents: read
-  pull-requests: write
-
 jobs:
-  vigia:
+  check:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write   # required to post the review comments
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - uses: eduardo-mr1/vigia@v1
+```
+
+That's the whole setup. Vigía only reads the test files touched by the PR, so it stays fast on large repos and never floods an existing codebase with legacy findings.
+
+### Options
+
+<!-- TODO: replace with your real inputs from action.yml -->
+
+```yaml
       - uses: eduardo-mr1/vigia@v1
         with:
-          solo-cambios: 'true'
-          codigo-fuente: './app'   # habilita la regla de aserciones huérfanas
+          paths: 'src/**/*.test.ts'   # glob for test files (default: common test globs)
+          fail-on-find: false         # true to fail the check instead of only commenting
+          ignore: 'legacy/**'         # globs to skip
 ```
 
-Comenta en el PR con los hallazgos de los archivos que ese PR toca, y actualiza
-el mismo comentario en cada push en lugar de acumular uno por commit.
-
-| Entrada | Por defecto | Para qué |
+| Input | Default | Description |
 |---|---|---|
-| `ruta` | `.` | Directorio a analizar cuando no se limita al PR |
-| `codigo-fuente` | — | Raíz del código; habilita la regla de aserciones huérfanas |
-| `solo-cambios` | `true` | Analizar solo los archivos de prueba del PR |
-| `fallar-en-p1` | `true` | Terminar el job con error si hay P1 |
-| `comentar` | `true` | Publicar el resultado en el PR |
+| `paths` | common test globs | Which files to analyse |
+| `fail-on-find` | `false` | Fail the job when something is found |
+| `ignore` | — | Globs to exclude |
 
 ---
 
-## Decisiones de diseño
+## How it works
 
-### AST, no expresiones regulares
+Vigía parses each changed test file into an AST rather than matching text, so it survives formatting, comments and unusual assertion styles. For every test block it walks the body looking for a call that can actually fail; if it doesn't find one, the block is reported with its line number.
 
-Un `expect` dentro de un comentario o de una cadena de texto no es una
-aserción. Un regex no distingue la diferencia y produce falsos positivos; el
-árbol sintáctico de TypeScript sí. Hay pruebas explícitas de ambos casos.
+<!-- TODO: one or two sentences on the specifics — which parser (ts-morph? @babel/parser?
+     typescript compiler API?), how you identify a "test block", how you recognise an
+     assertion call. This is the paragraph a technical reviewer reads closest. -->
 
-Esta regla no es teórica. La detección de aserciones huérfanas se escribió
-primero con expresiones regulares, y **el autoanálisis de la propia herramienta
-la delató**: marcaba código de ejemplo escrito dentro de una cadena en sus
-propias pruebas. Siete falsos positivos en el primer intento. Se reescribió
-sobre el AST.
-
-Los flujos de Maestro sí se analizan como texto: YAML no tiene un árbol a mano
-y su estructura es lo bastante plana para hacerlo sin ambigüedad.
-
-Cuesta más escribirlo, pero una herramienta de calidad que se equivoca se
-desinstala en la primera semana.
-
-### Solo los P1 rompen el build
-
-Una prueba omitida merece saberse, no bloquear un release. Cuando todo es
-bloqueante, el equipo aprende a saltarse la herramienta — y entonces deja de
-servir para lo que sí importa.
-
-### Sin dependencias de runtime
-
-`package.json` declara cero dependencias de producción. El compilador de
-TypeScript ya trae el parser, y la Action corre el `dist` compilado. Una
-herramienta que se instala en CI ajeno no debería arrastrar un árbol de
-paquetes.
-
-### Se analiza a sí misma
-
-El CI corre `vigia` sobre su propio código en cada push. Si la herramienta no
-soporta su propio criterio, no tiene por qué imponérselo a nadie.
+Written in TypeScript. No runtime dependency on your test framework — Vigía never executes your tests, it only reads them.
 
 ---
 
-## Calidad
+## Vigía tests itself
 
-| | |
-|---|---|
-| Pruebas | 129 |
-| Cobertura | 99.6% de líneas, 88% de ramas |
-| Dependencias de runtime | 0 |
-| Lint | ESLint estricto, cero advertencias permitidas |
-| Tipos | TypeScript `strict` con `noUncheckedIndexedAccess` |
+The tooling that polices assertions is not exempt from them. The suite covers every detection rule with both a positive and a negative fixture, and Vigía runs against its own test files on every pull request.
+
+<!-- TODO: put the real number here once you check: "N tests, M fixtures" -->
 
 ```bash
-npm test              # suite completa
-npm run test:coverage # con umbrales
-npm run lint
-npm run typecheck
-npm run build
+npm test
 ```
 
 ---
 
-## El `await` que falta
+## Limitations
 
-```ts
-it('rechaza credenciales inválidas', async () => {
-  expect(login('malo', 'malo')).rejects.toThrow();
-});
-```
+Worth stating plainly, because a linter you can't trust is worse than none:
 
-`expect(...).rejects` devuelve una promesa. Sin `await` ni `return`, la prueba
-termina antes de que se resuelva: el fallo se pierde, o aparece más tarde
-atribuido a otro caso. Jest a veces avisa y a veces no, según la versión y
-según si otra prueba absorbe el rechazo.
-
-Es el defecto más común en suites asíncronas y el más difícil de ver leyendo,
-porque la línea parece completa. Vigía sigue la cadena hasta la raíz: si el
-`expect` lleva `.resolves` o `.rejects` y la expresión no está esperada ni
-devuelta, la marca.
-
-### En Playwright es aún peor
-
-```ts
-test('el botón aparece', async ({ page }) => {
-  expect(page.locator('#guardar')).toBeVisible();   // sin await
-});
-```
-
-En Playwright **toda** aserción sobre un locator es asíncrona: reintenta hasta
-cumplirse o agotar el tiempo. Sin `await` la aserción se descarta entera. La
-línea se ve idéntica a una síncrona, y por eso se cuela tanto.
-
-Vigía activa los 24 matchers de Playwright solo cuando el archivo importa
-`@playwright/test`. Sin ese import, `toBeVisible` es el matcher síncrono de
-jest-dom o de React Native Testing Library, y exigir `await` sería un falso
-positivo. Ambos casos tienen prueba.
+- **It reasons about structure, not meaning.** A test with one weak assertion passes Vigía and still proves little. Vigía raises the floor; it does not measure quality.
+- **Custom assertion helpers** need to be declared, or they read as absent. <!-- TODO: adjust if you auto-detect them -->
+- **Only JavaScript and TypeScript** today. <!-- TODO: drop or update -->
 
 ---
 
-## Estado
+## Why I built it
 
-Siete reglas funcionando y probadas. En el roadmap:
-
-- **Mapa de casos afectados** — qué casos del plan de pruebas toca cada PR
-- **Delta de cobertura** contra la rama base
-- **Pruebas idénticas** — dos casos con distinto nombre y el mismo cuerpo
-- **`cy.get()` sin aserción en la cadena** — acciones sin verificación
-- **Publicación en npm** — para que `npx vigia` funcione sin clonar el repo
+I lead QA for a mobile product where a passing suite is the gate before release. A test that verifies nothing doesn't just fail to catch a bug — it actively hides that the case was never covered, which is worse than having no test at all. Reviewers miss them consistently, and no existing tool was looking. So I wrote the one that does.
 
 ---
 
-## Autor
+## License
 
-**Eduardo Maytorena** — Product Owner y QA Manager
-Culiacán, Sinaloa, México
-
-## Licencia
-
-MIT — ver [LICENSE](./LICENSE).
+MIT — see [LICENSE](LICENSE).
