@@ -1,0 +1,10 @@
+# Normaliza finales de linea: LF en el repositorio, nativos en el disco.
+# Sin esto, editar desde Windows marca archivos enteros como modificados
+# aunque no cambie ni un caracter.
+* text=auto eol=lf
+
+# Binarios: no tocar.
+*.png binary
+*.jpg binary
+*.gif binary
+*.pdf binary
