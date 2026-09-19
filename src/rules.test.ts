@@ -13,7 +13,7 @@ function findings(code: string, rule: Parameters<typeof analyzeSource>[2]) {
 }
 
 describe('noAssertion', () => {
-  it('detecta una prueba sin expect', () => {
+  it('detects a test with no expect', () => {
     const result = findings(
       `it('suma dos numeros', () => {
          const total = 1 + 1;
@@ -26,13 +26,13 @@ describe('noAssertion', () => {
     expect(result[0]?.message).toContain('suma dos numeros');
   });
 
-  it('acepta una prueba con expect', () => {
+  it('accepts a test with expect', () => {
     expect(
       findings(`it('suma', () => { expect(1 + 1).toBe(2); });`, [noAssertion]),
     ).toEqual([]);
   });
 
-  it('reconoce expect anidado dentro de un callback', () => {
+  it('recognizes an expect nested inside a callback', () => {
     expect(
       findings(
         `it('itera', () => { [1, 2].forEach((n) => { expect(n).toBeGreaterThan(0); }); });`,
@@ -41,7 +41,7 @@ describe('noAssertion', () => {
     ).toEqual([]);
   });
 
-  it('acepta una prueba asíncrona con expect', () => {
+  it('accepts an async test with expect', () => {
     expect(
       findings(`it('espera', async () => { await expect(f()).resolves.toBe(1); });`, [
         noAssertion,
@@ -49,9 +49,9 @@ describe('noAssertion', () => {
     ).toEqual([]);
   });
 
-  // Un expect dentro de un comentario o de una cadena no es una asercion: es la
-  // razon por la que el analisis usa el AST y no expresiones regulares.
-  it('no se deja engañar por un expect en un comentario', () => {
+  // An expect inside a comment or a string isn't an assertion: that's why
+  // the analysis uses the AST instead of regular expressions.
+  it('is not fooled by an expect inside a comment', () => {
     expect(
       findings(`it('finge', () => { /* expect(1).toBe(1) */ const x = 1; });`, [
         noAssertion,
@@ -59,36 +59,36 @@ describe('noAssertion', () => {
     ).toHaveLength(1);
   });
 
-  it('no se deja engañar por un expect dentro de una cadena', () => {
+  it('is not fooled by an expect inside a string', () => {
     expect(
       findings(`it('finge', () => { const s = 'expect(1).toBe(1)'; });`, [noAssertion]),
     ).toHaveLength(1);
   });
 
-  it('funciona con test() además de it()', () => {
+  it('works with test() as well as it()', () => {
     expect(findings(`test('vacia', () => {});`, [noAssertion])).toHaveLength(1);
   });
 
-  it('reporta la línea correcta', () => {
+  it('reports the correct line', () => {
     const result = findings(`\n\nit('vacia', () => {});`, [noAssertion]);
     expect(result[0]?.line).toBe(3);
   });
 });
 
 describe('expectWithoutMatcher', () => {
-  it('detecta expect() suelto', () => {
+  it('detects a bare expect()', () => {
     const result = findings(`it('a', () => { expect(valor); });`, [expectWithoutMatcher]);
     expect(result).toHaveLength(1);
     expect(result[0]?.rule).toBe('expect-without-matcher');
   });
 
-  it('acepta expect con matcher', () => {
+  it('accepts expect with a matcher', () => {
     expect(
       findings(`it('a', () => { expect(valor).toBe(1); });`, [expectWithoutMatcher]),
     ).toEqual([]);
   });
 
-  it('acepta expect con matcher negado', () => {
+  it('accepts expect with a negated matcher', () => {
     expect(
       findings(`it('a', () => { expect(valor).not.toBe(1); });`, [expectWithoutMatcher]),
     ).toEqual([]);
@@ -96,7 +96,7 @@ describe('expectWithoutMatcher', () => {
 });
 
 describe('tautology', () => {
-  it('detecta expect(true).toBe(true)', () => {
+  it('detects expect(true).toBe(true)', () => {
     const result = findings(`it('a', () => { expect(true).toBe(true); });`, [tautology]);
     expect(result).toHaveLength(1);
     expect(result[0]?.rule).toBe('tautology');
@@ -106,22 +106,22 @@ describe('tautology', () => {
     `expect(1).toBe(1)`,
     `expect('x').toEqual('x')`,
     `expect(null).toStrictEqual(null)`,
-  ])('detecta %s', (assertion) => {
+  ])('detects %s', (assertion) => {
     expect(findings(`it('a', () => { ${assertion}; });`, [tautology])).toHaveLength(1);
   });
 
-  it('acepta comparar una variable contra un literal', () => {
+  it('accepts comparing a variable against a literal', () => {
     expect(findings(`it('a', () => { expect(total).toBe(2); });`, [tautology])).toEqual([]);
   });
 
-  it('acepta literales distintos: eso sí puede fallar', () => {
+  it('accepts different literals: that actually can fail', () => {
     expect(findings(`it('a', () => { expect(1).toBe(2); });`, [tautology])).toEqual([]);
   });
 });
 
 describe('skippedTest', () => {
   it.each(['it.skip', 'test.skip', 'describe.skip', 'xit', 'xdescribe'])(
-    'detecta %s',
+    'detects %s',
     (form) => {
       const result = findings(`${form}('algo', () => { expect(1).toBe(2); });`, [
         skippedTest,
@@ -131,7 +131,7 @@ describe('skippedTest', () => {
     },
   );
 
-  it('acepta una prueba activa', () => {
+  it('accepts an active test', () => {
     expect(
       findings(`it('activa', () => { expect(1).toBe(2); });`, [skippedTest]),
     ).toEqual([]);
@@ -139,24 +139,24 @@ describe('skippedTest', () => {
 });
 
 describe('focusedTest', () => {
-  it.each(['it.only', 'describe.only', 'test.only'])('detecta %s', (form) => {
+  it.each(['it.only', 'describe.only', 'test.only'])('detects %s', (form) => {
     const result = findings(`${form}('algo', () => { expect(1).toBe(2); });`, [
       focusedTest,
     ]);
     expect(result).toHaveLength(1);
-    // Es P1: en CI silencia el resto de la suite sin avisar.
+    // It's P1: in CI it silences the rest of the suite without warning.
     expect(result[0]?.severity).toBe('P1');
   });
 
-  it('acepta una prueba normal', () => {
+  it('accepts a normal test', () => {
     expect(findings(`it('normal', () => { expect(1).toBe(2); });`, [focusedTest])).toEqual(
       [],
     );
   });
 });
 
-describe('todas las reglas juntas', () => {
-  it('ordena los hallazgos por línea', () => {
+describe('all the rules together', () => {
+  it('sorts findings by line', () => {
     const result = analyzeSource(
       'x.test.ts',
       `it.only('enfocada', () => { expect(1).toBe(1); });
@@ -168,7 +168,7 @@ describe('todas las reglas juntas', () => {
     expect([...lines].sort((a, b) => a - b)).toEqual(lines);
   });
 
-  it('no reporta nada en un archivo sano', () => {
+  it('reports nothing in a healthy file', () => {
     expect(
       analyzeSource(
         'sano.test.ts',
@@ -181,13 +181,13 @@ describe('todas las reglas juntas', () => {
     ).toEqual([]);
   });
 
-  it('tolera código con errores de sintaxis sin lanzar', () => {
+  it('tolerates code with syntax errors without throwing', () => {
     expect(() => analyzeSource('roto.test.ts', `it('a', () => { expect(`)).not.toThrow();
   });
 });
 
-describe('formas poco comunes de declarar pruebas', () => {
-  it('reconoce it.each con plantilla etiquetada', () => {
+describe('uncommon ways of declaring tests', () => {
+  it('recognizes it.each with a tagged template', () => {
     const result = findings(
       'it.each`\n  a\n  ${1}\n`("caso $a", () => {});',
       [noAssertion],
@@ -195,40 +195,40 @@ describe('formas poco comunes de declarar pruebas', () => {
     expect(result).toHaveLength(1);
   });
 
-  it('reconoce una prueba escrita con function() en vez de flecha', () => {
+  it('recognizes a test written with function() instead of an arrow', () => {
     expect(
       findings(`it('clasica', function () { const x = 1; });`, [noAssertion]),
     ).toHaveLength(1);
   });
 
-  it('ignora una llamada sin cuerpo, como it.todo', () => {
-    // it.todo solo lleva titulo: no hay cuerpo que revisar, y ya lo cubre
-    // la regla de pruebas omitidas.
+  it('ignores a call with no body, like it.todo', () => {
+    // it.todo only carries a title: there's no body to inspect, and the
+    // skipped-test rule already covers it.
     expect(findings(`it.todo('pendiente');`, [noAssertion])).toEqual([]);
   });
 
-  it('detecta el título ausente sin romperse', () => {
+  it('detects the missing title without breaking', () => {
     const result = findings(`it(nombreDinamico, () => {});`, [noAssertion]);
     expect(result[0]?.message).toContain('(untitled)');
   });
 });
 
 describe('missingAwait', () => {
-  // El defecto: la promesa se resuelve despues de que la prueba termino, y el
-  // fallo se pierde o se atribuye a otro caso.
+  // The defect: the promise settles after the test has already finished,
+  // and the failure is lost or blamed on a different case.
   it.each([
     `expect(login('malo')).rejects.toThrow();`,
     `expect(cargar()).resolves.toBe(1);`,
     `expect(f()).rejects.toThrowError('x');`,
     `expect(f()).resolves.toEqual({ a: 1 });`,
-  ])('detecta %s sin await', (assertion) => {
+  ])('detects %s without await', (assertion) => {
     const result = findings(`it('a', async () => { ${assertion} });`, [missingAwait]);
     expect(result).toHaveLength(1);
     expect(result[0]?.rule).toBe('missing-await');
     expect(result[0]?.severity).toBe('P1');
   });
 
-  it('acepta la versión con await', () => {
+  it('accepts the version with await', () => {
     expect(
       findings(`it('a', async () => { await expect(f()).rejects.toThrow(); });`, [
         missingAwait,
@@ -236,20 +236,20 @@ describe('missingAwait', () => {
     ).toEqual([]);
   });
 
-  it('acepta la versión con return', () => {
+  it('accepts the version with return', () => {
     expect(
       findings(`it('a', () => { return expect(f()).rejects.toThrow(); });`, [missingAwait]),
     ).toEqual([]);
   });
 
-  it('acepta una aserción síncrona sin await', () => {
+  it('accepts a synchronous assertion with no await', () => {
     expect(
       findings(`it('a', () => { expect(sumar(1, 1)).toBe(2); });`, [missingAwait]),
     ).toEqual([]);
   });
 
-  it('no marca una promesa asignada a una variable', () => {
-    // Aqui la promesa se guarda, presumiblemente para esperarla despues.
+  it('does not flag a promise assigned to a variable', () => {
+    // Here the promise is stored, presumably to be awaited later.
     expect(
       findings(`it('a', async () => { const p = expect(f()).rejects.toThrow(); await p; });`, [
         missingAwait,
@@ -257,14 +257,14 @@ describe('missingAwait', () => {
     ).toEqual([]);
   });
 
-  it('nombra el modificador en el mensaje', () => {
+  it('names the modifier in the message', () => {
     const result = findings(`it('a', async () => { expect(f()).rejects.toThrow(); });`, [
       missingAwait,
     ]);
     expect(result[0]?.message).toContain('rejects');
   });
 
-  it('detecta varias en la misma prueba', () => {
+  it('detects several in the same test', () => {
     const result = findings(
       `it('a', async () => {
          expect(f()).rejects.toThrow();
@@ -275,14 +275,14 @@ describe('missingAwait', () => {
     expect(result).toHaveLength(2);
   });
 
-  it('no marca un expect sin modificador asíncrono', () => {
+  it('does not flag an expect with no async modifier', () => {
     expect(
       findings(`it('a', () => { expect(obj).toHaveProperty('rejects'); });`, [missingAwait]),
     ).toEqual([]);
   });
 });
 
-describe('missingAwait en Playwright', () => {
+describe('missingAwait in Playwright', () => {
   const IMPORT = `import { expect, test } from '@playwright/test';\n`;
 
   it.each([
@@ -291,7 +291,7 @@ describe('missingAwait en Playwright', () => {
     `expect(page.getByTestId('total')).toHaveText('$0.00');`,
     `expect(page.locator('.fila')).toHaveCount(3);`,
     `expect(page).toHaveURL('/inicio');`,
-  ])('detecta %s sin await', (assertion) => {
+  ])('detects %s without await', (assertion) => {
     const result = findings(
       `${IMPORT}test('a', async ({ page }) => { ${assertion} });`,
       [missingAwait],
@@ -300,7 +300,7 @@ describe('missingAwait en Playwright', () => {
     expect(result[0]?.rule).toBe('missing-await');
   });
 
-  it('acepta la versión con await', () => {
+  it('accepts the version with await', () => {
     expect(
       findings(
         `${IMPORT}test('a', async ({ page }) => { await expect(page.locator('#x')).toBeVisible(); });`,
@@ -309,7 +309,7 @@ describe('missingAwait en Playwright', () => {
     ).toEqual([]);
   });
 
-  it('acepta una aserción negada con await', () => {
+  it('accepts a negated assertion with await', () => {
     expect(
       findings(
         `${IMPORT}test('a', async ({ page }) => { await expect(page.locator('#x')).not.toBeVisible(); });`,
@@ -318,10 +318,10 @@ describe('missingAwait en Playwright', () => {
     ).toEqual([]);
   });
 
-  // Sin el import de Playwright, toBeVisible es el matcher sincrono de
-  // jest-dom o de React Native Testing Library: exigir await seria un falso
-  // positivo.
-  it('no marca toBeVisible en un archivo que no usa Playwright', () => {
+  // Without the Playwright import, toBeVisible is the synchronous matcher
+  // from jest-dom or React Native Testing Library: requiring await would be
+  // a false positive.
+  it('does not flag toBeVisible in a file that does not use Playwright', () => {
     expect(
       findings(`it('a', () => { expect(getByTestId('x')).toBeVisible(); });`, [
         missingAwait,
@@ -329,7 +329,7 @@ describe('missingAwait en Playwright', () => {
     ).toEqual([]);
   });
 
-  it('sigue detectando .rejects en un archivo de Playwright', () => {
+  it('still detects .rejects in a Playwright file', () => {
     expect(
       findings(`${IMPORT}test('a', async () => { expect(f()).rejects.toThrow(); });`, [
         missingAwait,
@@ -337,7 +337,7 @@ describe('missingAwait en Playwright', () => {
     ).toHaveLength(1);
   });
 
-  it('reconoce el import con subruta de Playwright', () => {
+  it('recognizes the Playwright import with a subpath', () => {
     expect(
       findings(
         `import { expect } from '@playwright/test/index';\ntest('a', async ({ page }) => { expect(page.locator('#x')).toBeVisible(); });`,
@@ -347,10 +347,10 @@ describe('missingAwait en Playwright', () => {
   });
 });
 
-describe('noAssertion con otras formas de aserción', () => {
-  // Cypress asierta con .should(), no con expect. Sin reconocerlo, toda prueba
-  // de Cypress se reportaria como defectuosa.
-  it('acepta una prueba de Cypress con should', () => {
+describe('noAssertion with other assertion forms', () => {
+  // Cypress asserts with .should(), not expect. Without recognizing that,
+  // every Cypress test would be reported as defective.
+  it('accepts a Cypress test with should', () => {
     expect(
       findings(`it('a', () => { cy.get('#total').should('have.text', '$0.00'); });`, [
         noAssertion,
@@ -358,7 +358,7 @@ describe('noAssertion con otras formas de aserción', () => {
     ).toEqual([]);
   });
 
-  it('acepta el encadenado con and', () => {
+  it('accepts the chained and', () => {
     expect(
       findings(`it('a', () => { cy.get('#x').should('exist').and('be.visible'); });`, [
         noAssertion,
@@ -366,14 +366,14 @@ describe('noAssertion con otras formas de aserción', () => {
     ).toEqual([]);
   });
 
-  it('acepta assert de Chai', () => {
+  it('accepts Chai assert', () => {
     expect(
       findings(`it('a', () => { assert.equal(sumar(1, 1), 2); });`, [noAssertion]),
     ).toEqual([]);
   });
 
-  // Una prueba de Cypress que solo hace acciones sigue sin verificar nada.
-  it('detecta una prueba de Cypress sin ninguna aserción', () => {
+  // A Cypress test that only performs actions still verifies nothing.
+  it('detects a Cypress test with no assertion at all', () => {
     expect(
       findings(`it('a', () => { cy.visit('/'); cy.get('#boton').click(); });`, [
         noAssertion,

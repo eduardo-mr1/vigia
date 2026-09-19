@@ -33,92 +33,92 @@ describe('collectKnownIds', () => {
     fs.writeFileSync(full, code);
   }
 
-  it('recoge identificadores literales', () => {
+  it('collects literal identifiers', () => {
     write('boton.tsx', `<Pressable testID="fab-agregar" />`);
     expect(collectKnownIds(dir).exact.has('fab-agregar')).toBe(true);
   });
 
-  it('acepta comillas simples y data-testid', () => {
+  it('accepts single quotes and data-testid', () => {
     write('a.tsx', `<div data-testid='menu-principal' />`);
     expect(collectKnownIds(dir).exact.has('menu-principal')).toBe(true);
   });
 
-  // Un id construido solo revela su prefijo: gasto-0, gasto-1... son validos.
-  it('recoge el prefijo de un identificador construido', () => {
+  // A constructed id only reveals its prefix: gasto-0, gasto-1... are valid.
+  it('collects the prefix of a constructed identifier', () => {
     write('fila.tsx', '<View testID={`gasto-${index}`} />');
     expect(collectKnownIds(dir).prefixes).toContain('gasto-');
   });
 
-  it('no lee los archivos de prueba', () => {
+  it('does not read test files', () => {
     write('a.test.tsx', `<View testID="solo-en-pruebas" />`);
     expect(collectKnownIds(dir).exact.size).toBe(0);
   });
 
-  it('no entra a node_modules', () => {
+  it('does not walk into node_modules', () => {
     write('node_modules/lib/a.tsx', `<View testID="de-libreria" />`);
     expect(collectKnownIds(dir).exact.size).toBe(0);
   });
 
-  it('devuelve conjuntos vacíos en un proyecto sin identificadores', () => {
+  it('returns empty sets in a project with no identifiers', () => {
     write('a.ts', `export const x = 1;`);
     expect(collectKnownIds(dir)).toEqual({ exact: new Set(), prefixes: [] });
   });
 
-  it('tolera un directorio inexistente', () => {
+  it('tolerates a nonexistent directory', () => {
     expect(collectSourceFiles(path.join(dir, 'no-existe'))).toEqual([]);
   });
 });
 
 describe('isKnown', () => {
-  it('reconoce un identificador literal', () => {
+  it('recognizes a literal identifier', () => {
     expect(isKnown('fab-agregar', known(['fab-agregar']))).toBe(true);
   });
 
-  it('reconoce uno que coincide con un prefijo construido', () => {
+  it('recognizes one that matches a constructed prefix', () => {
     expect(isKnown('gasto-42', known([], ['gasto-']))).toBe(true);
   });
 
-  it('rechaza uno que no existe', () => {
+  it('rejects one that does not exist', () => {
     expect(isKnown('inventado', known(['fab-agregar'], ['gasto-']))).toBe(false);
   });
 
-  // Un prefijo vacio haria que todo identificador pareciera valido y la regla
-  // dejaria de detectar nada.
-  it('ignora un prefijo vacío', () => {
+  // An empty prefix would make every identifier look valid, and the rule
+  // would stop detecting anything.
+  it('ignores an empty prefix', () => {
     expect(isKnown('lo-que-sea', known([], ['']))).toBe(false);
   });
 });
 
 describe('classify', () => {
-  it('un literal declarado es exacto', () => {
+  it('a declared literal is exact', () => {
     expect(classify('fab-agregar', known(['fab-agregar']))).toBe('exact');
   });
 
-  it('un sufijo simple sobre un prefijo construido es exacto', () => {
+  it('a simple suffix over a constructed prefix is exact', () => {
     expect(classify('gasto-42', known([], ['gasto-']))).toBe('exact');
     expect(classify('categoria-comida', known([], ['categoria-']))).toBe('exact');
   });
 
-  // El caso que originó la herramienta.
-  it('un sufijo compuesto sobre un prefijo construido es solo probable', () => {
+  // The case that started the tool.
+  it('a compound suffix over a constructed prefix is only probable', () => {
     expect(classify('gasto-monto-9999-duplicado', known([], ['gasto-monto-']))).toBe(
       'probable',
     );
   });
 
-  it('sin coincidencia alguna es inexistente', () => {
+  it('no match at all is nonexistent', () => {
     expect(classify('inventado', known(['real'], ['gasto-']))).toBe('nonexistent');
   });
 
-  it('usa el prefijo más específico cuando varios coinciden', () => {
-    // 'gasto-monto-7' encaja con 'gasto-' y con 'gasto-monto-'; el segundo deja
-    // el sufijo '7', que sí es un valor de interpolacion.
+  it('uses the most specific prefix when several match', () => {
+    // 'gasto-monto-7' matches 'gasto-' and 'gasto-monto-'; the latter leaves
+    // the suffix '7', which is indeed an interpolated value.
     expect(classify('gasto-monto-7', known([], ['gasto-', 'gasto-monto-']))).toBe('exact');
   });
 });
 
 describe('findNegativeAssertions', () => {
-  it('encuentra assertNotVisible con id anidado, como en Maestro', () => {
+  it('finds assertNotVisible with a nested id, like in Maestro', () => {
     const result = findNegativeAssertions(
       'flujo.yaml',
       ['- assertNotVisible:', '    id: "gasto-duplicado"'].join('\n'),
@@ -128,7 +128,7 @@ describe('findNegativeAssertions', () => {
     expect(result[0]?.line).toBe(2);
   });
 
-  it('encuentra assertNotVisible en la misma línea', () => {
+  it('finds assertNotVisible on the same line', () => {
     const result = findNegativeAssertions('flujo.yaml', '- assertNotVisible: pantalla-error');
     expect(result[0]?.id).toBe('pantalla-error');
   });
@@ -139,33 +139,33 @@ describe('findNegativeAssertions', () => {
     `expect(screen.queryByTestId('x')).toBeUndefined()`,
     `expect(queryByTestId('x')).not.toBeVisible()`,
     `expect(screen.queryByTestId('x')).not.toBeTruthy()`,
-  ])('encuentra la forma %s', (code) => {
+  ])('finds the %s form', (code) => {
     const result = findNegativeAssertions('prueba.test.ts', code);
     expect(result).toHaveLength(1);
     expect(result[0]?.id).toBe('x');
   });
 
-  it('ignora una aserción positiva', () => {
+  it('ignores a positive assertion', () => {
     expect(
       findNegativeAssertions('prueba.test.ts', `expect(getByTestId('x')).toBeVisible()`),
     ).toEqual([]);
   });
 
-  it('ignora assertVisible', () => {
+  it('ignores assertVisible', () => {
     expect(findNegativeAssertions('flujo.yaml', '- assertVisible:\n    id: "boton"')).toEqual(
       [],
     );
   });
 
-  it('reporta la línea correcta en un archivo largo', () => {
+  it('reports the correct line in a long file', () => {
     const code = ['', '', `expect(queryByTestId('tardio')).toBeNull()`].join('\n');
     expect(findNegativeAssertions('prueba.test.ts', code)[0]?.line).toBe(3);
   });
 
-  // El autoanalisis de la propia herramienta delato este falso positivo: la
-  // version con expresiones regulares marcaba codigo escrito dentro de una
-  // cadena de texto.
-  it('no marca una aserción escrita dentro de una cadena', () => {
+  // The tool's own self-analysis caught this false positive: the
+  // regex-based version flagged code written inside a string
+  // literal.
+  it('does not flag an assertion written inside a string', () => {
     const code = `it('describe la regla', () => {
       const ejemplo = "expect(queryByTestId('inventado')).toBeNull()";
       expect(analizar(ejemplo)).toHaveLength(1);
@@ -173,19 +173,19 @@ describe('findNegativeAssertions', () => {
     expect(findNegativeAssertions('meta.test.ts', code)).toEqual([]);
   });
 
-  it('no marca una aserción escrita en un comentario', () => {
+  it('does not flag an assertion written in a comment', () => {
     const code = `// expect(queryByTestId('inventado')).toBeNull()`;
     expect(findNegativeAssertions('meta.test.ts', code)).toEqual([]);
   });
 
-  it('devuelve vacío sin aserciones', () => {
+  it('returns empty with no assertions', () => {
     expect(findNegativeAssertions('prueba.test.ts', 'const x = 1;')).toEqual([]);
   });
 });
 
 describe('orphanNegativeAssertions', () => {
-  // El caso real: un identificador que la app nunca genera.
-  it('reporta una aserción sobre un identificador inexistente', () => {
+  // The real case: an identifier the app never generates.
+  it('reports an assertion on a nonexistent identifier', () => {
     const result = orphanNegativeAssertions(
       'flujo.yaml',
       '- assertNotVisible:\n    id: "gasto-monto-9999-duplicado"',
@@ -195,12 +195,12 @@ describe('orphanNegativeAssertions', () => {
     expect(result).toHaveLength(1);
     expect(result[0]?.rule).toBe('orphan-negative-assertion');
     expect(result[0]?.message).toContain('gasto-monto-9999-duplicado');
-    // El prefijo 'gasto-monto-' existe, pero el sufijo '9999-duplicado' no es
-    // un valor de interpolacion: se reporta como sospechoso, no como certeza.
+    // The prefix 'gasto-monto-' exists, but the suffix '9999-duplicado' isn't
+    // an interpolated value: it's reported as suspicious, not certain.
     expect(result[0]?.severity).toBe('P2');
   });
 
-  it('acepta una aserción sobre un identificador que sí existe', () => {
+  it('accepts an assertion on an identifier that does exist', () => {
     expect(
       orphanNegativeAssertions(
         'flujo.yaml',
@@ -210,7 +210,7 @@ describe('orphanNegativeAssertions', () => {
     ).toEqual([]);
   });
 
-  it('reporta P1 cuando el identificador no coincide con nada', () => {
+  it('reports P1 when the identifier matches nothing', () => {
     const result = orphanNegativeAssertions(
       'flujo.yaml',
       '- assertNotVisible:\n    id: "pantalla-que-no-existe"',
@@ -219,7 +219,7 @@ describe('orphanNegativeAssertions', () => {
     expect(result[0]?.severity).toBe('P1');
   });
 
-  it('acepta una aserción que coincide con un prefijo construido', () => {
+  it('accepts an assertion that matches a constructed prefix', () => {
     expect(
       orphanNegativeAssertions(
         'flujo.yaml',
@@ -229,7 +229,7 @@ describe('orphanNegativeAssertions', () => {
     ).toEqual([]);
   });
 
-  it('la sugerencia nombra el identificador para poder actuar', () => {
+  it('the hint names the identifier, so there is something to act on', () => {
     const result = orphanNegativeAssertions(
       'x.test.ts',
       `expect(queryByTestId('inventado')).toBeNull()`,
@@ -238,7 +238,7 @@ describe('orphanNegativeAssertions', () => {
     expect(result[0]?.hint).toContain('inventado');
   });
 
-  it('reporta varias aserciones huérfanas en un mismo archivo', () => {
+  it('reports several orphan assertions in the same file', () => {
     const result = orphanNegativeAssertions(
       'flujo.yaml',
       [

@@ -6,14 +6,14 @@ import { analyzeFiles, collectTestFiles, isFlowFile, isTestFile } from './analyz
 
 describe('isTestFile', () => {
   it.each(['a.test.ts', 'b.spec.ts', 'c.test.tsx', 'd.spec.js'])(
-    'reconoce %s como archivo de prueba',
+    'recognizes %s as a test file',
     (file) => {
       expect(isTestFile(file)).toBe(true);
     },
   );
 
   it.each(['index.ts', 'testing.ts', 'spec.ts', 'README.md'])(
-    'descarta %s',
+    'rejects %s',
     (file) => {
       expect(isTestFile(file)).toBe(false);
     },
@@ -38,7 +38,7 @@ describe('analyzeFiles', () => {
     return full;
   }
 
-  it('analiza solo archivos de prueba y flujos', () => {
+  it('analyzes only test files and flows', () => {
     const test = write('a.test.ts', `it('vacia', () => {});`);
     const source = write('a.ts', `export const x = 1;`);
 
@@ -47,7 +47,7 @@ describe('analyzeFiles', () => {
     expect(result.findings).toHaveLength(1);
   });
 
-  it('detecta una aserción negativa huérfana en un flujo de Maestro', () => {
+  it('detects an orphan negative assertion in a Maestro flow', () => {
     write('pantalla.tsx', `<View testID="lista" />`);
     const flow = write('flujo.yaml', '- assertNotVisible:\n    id: "no-existe"');
 
@@ -56,21 +56,21 @@ describe('analyzeFiles', () => {
     expect(result.findings[0]?.rule).toBe('orphan-negative-assertion');
   });
 
-  // Sin saber que identificadores existen, cualquier hallazgo seria una
-  // suposicion: la regla no se aplica.
-  it('omite la regla de aserciones huérfanas si no se da la raíz del código', () => {
+  // Without knowing which identifiers exist, any finding would be a
+  // guess: the rule doesn't apply.
+  it('skips the orphan-assertion rule when no source root is given', () => {
     const flow = write('flujo.yaml', '- assertNotVisible:\n    id: "no-existe"');
     expect(analyzeFiles([flow]).findings).toEqual([]);
   });
 
-  it('acepta una aserción negativa sobre un identificador real', () => {
+  it('accepts a negative assertion on a real identifier', () => {
     write('pantalla.tsx', `<View testID="badge-pending" />`);
     const flow = write('flujo.yaml', '- assertNotVisible:\n    id: "badge-pending"');
 
     expect(analyzeFiles([flow], { sourceRoot: dir }).findings).toEqual([]);
   });
 
-  it('ordena los hallazgos por archivo y línea', () => {
+  it('sorts findings by file and line', () => {
     const b = write('b.test.ts', `it('vacia', () => {});`);
     const a = write('a.test.ts', `it('vacia', () => {});`);
 
@@ -78,36 +78,36 @@ describe('analyzeFiles', () => {
     expect([...files].sort()).toEqual(files);
   });
 
-  // Un archivo borrado en el PR sigue apareciendo en el diff.
-  it('ignora archivos que ya no existen en lugar de fallar', () => {
+  // A file deleted in the PR still shows up in the diff.
+  it('ignores files that no longer exist instead of failing', () => {
     const result = analyzeFiles([path.join(dir, 'borrado.test.ts')]);
     expect(result.filesAnalyzed).toBe(0);
     expect(result.findings).toEqual([]);
   });
 
-  it('acumula hallazgos de varios archivos', () => {
+  it('accumulates findings across several files', () => {
     const a = write('a.test.ts', `it('vacia', () => {});`);
     const b = write('b.test.ts', `it.only('enfocada', () => { expect(1).toBe(2); });`);
 
     expect(analyzeFiles([a, b]).findings).toHaveLength(2);
   });
 
-  it('aplica reglas concretas cuando se le indican', () => {
+  it('applies specific rules when given', () => {
     const a = write('a.test.ts', `it.skip('omitida', () => { expect(1).toBe(2); });`);
     expect(analyzeFiles([a], { rules: [] }).findings).toEqual([]);
   });
 
-  it('devuelve vacío sin archivos', () => {
+  it('returns empty with no files', () => {
     expect(analyzeFiles([])).toEqual({ findings: [], filesAnalyzed: 0 });
   });
 });
 
 describe('isFlowFile', () => {
-  it.each(['flujo.yaml', 'flujo.yml'])('reconoce %s', (file) => {
+  it.each(['flujo.yaml', 'flujo.yml'])('recognizes %s', (file) => {
     expect(isFlowFile(file)).toBe(true);
   });
 
-  it('descarta otros formatos', () => {
+  it('rejects other formats', () => {
     expect(isFlowFile('config.json')).toBe(false);
   });
 });
@@ -123,7 +123,7 @@ describe('collectTestFiles', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  it('encuentra archivos de prueba en subdirectorios', () => {
+  it('finds test files in subdirectories', () => {
     fs.mkdirSync(path.join(dir, 'src', 'lib'), { recursive: true });
     fs.writeFileSync(path.join(dir, 'src', 'a.test.ts'), '');
     fs.writeFileSync(path.join(dir, 'src', 'lib', 'b.spec.ts'), '');
@@ -132,19 +132,19 @@ describe('collectTestFiles', () => {
     expect(collectTestFiles(dir)).toHaveLength(2);
   });
 
-  it('incluye los flujos E2E en YAML', () => {
+  it('includes YAML E2E flows', () => {
     fs.writeFileSync(path.join(dir, 'flujo.yaml'), '');
     expect(collectTestFiles(dir)).toHaveLength(1);
   });
 
-  it('no entra a node_modules', () => {
+  it('does not walk into node_modules', () => {
     fs.mkdirSync(path.join(dir, 'node_modules', 'paquete'), { recursive: true });
     fs.writeFileSync(path.join(dir, 'node_modules', 'paquete', 'x.test.ts'), '');
 
     expect(collectTestFiles(dir)).toEqual([]);
   });
 
-  it('devuelve una lista ordenada y estable', () => {
+  it('returns a sorted, stable list', () => {
     fs.writeFileSync(path.join(dir, 'z.test.ts'), '');
     fs.writeFileSync(path.join(dir, 'a.test.ts'), '');
 
@@ -152,7 +152,7 @@ describe('collectTestFiles', () => {
     expect(found).toEqual(['a.test.ts', 'z.test.ts']);
   });
 
-  it('tolera un directorio inexistente', () => {
+  it('tolerates a nonexistent directory', () => {
     expect(collectTestFiles(path.join(dir, 'no-existe'))).toEqual([]);
   });
 });
