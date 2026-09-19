@@ -28,6 +28,14 @@ Vigía is the check for that specific blind spot.
 
 ---
 
+## Demo
+
+![Vigía flagging six assertion-free tests in one file](docs/demo.gif)
+
+Real output from `node dist/cli.js ejemplo` against the fixture in this repo — nothing staged.
+
+---
+
 ## What it detects
 
 Seven checks, all built on the same idea: a test that can't fail is worse than no test, because it occupies the place of one that would.
