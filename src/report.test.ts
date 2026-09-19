@@ -3,13 +3,13 @@ import type { Finding } from './types';
 
 function finding(overrides: Partial<Finding> = {}): Finding {
   return {
-    rule: 'sin-assercion',
+    rule: 'no-assertion',
     severity: 'P1',
     file: 'src/a.test.ts',
     line: 10,
     column: 3,
-    message: 'La prueba "x" no contiene ninguna aserción.',
-    hint: 'Agrega un expect.',
+    message: 'Test "x" contains no assertion.',
+    hint: 'Add an expect.',
     ...overrides,
   };
 }
@@ -17,11 +17,11 @@ function finding(overrides: Partial<Finding> = {}): Finding {
 describe('renderReport', () => {
   it('informa cuando no hay hallazgos', () => {
     const report = renderReport({ findings: [], filesAnalyzed: 4 });
-    expect(report).toContain('Sin hallazgos en 4 archivos');
+    expect(report).toContain('No findings in 4 test files');
   });
 
   it('concuerda el singular con un solo archivo', () => {
-    expect(renderReport({ findings: [], filesAnalyzed: 1 })).toContain('1 archivo de prueba');
+    expect(renderReport({ findings: [], filesAnalyzed: 1 })).toContain('1 test file');
   });
 
   it('incluye el resumen por severidad', () => {
@@ -57,7 +57,7 @@ describe('renderReport', () => {
 
   it('incluye la sugerencia de corrección', () => {
     expect(renderReport({ findings: [finding()], filesAnalyzed: 1 })).toContain(
-      'Agrega un expect.',
+      'Add an expect.',
     );
   });
 

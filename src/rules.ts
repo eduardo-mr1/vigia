@@ -74,7 +74,7 @@ function isSuiteCall(node: ts.Node): node is ts.CallExpression {
 function titleOf(call: ts.CallExpression): string {
   const first = call.arguments[0];
   if (first && ts.isStringLiteralLike(first)) return first.text;
-  return '(sin título)';
+  return '(untitled)';
 }
 
 function bodyOf(call: ts.CallExpression): ts.Node | null {
@@ -144,10 +144,10 @@ export const noAssertion: Rule = (context) => {
       finding(
         context,
         node,
-        'sin-assercion',
+        'no-assertion',
         'P1',
-        `La prueba "${titleOf(node)}" no contiene ninguna aserción.`,
-        'Agrega un expect, o borra la prueba: hoy pasa aunque el código esté roto.',
+        `Test "${titleOf(node)}" contains no assertion.`,
+        'Add an expect, or delete the test: right now it passes even if the code is broken.',
       ),
     );
   });
@@ -172,10 +172,10 @@ export const expectWithoutMatcher: Rule = (context) => {
       finding(
         context,
         node,
-        'expect-sin-matcher',
+        'expect-without-matcher',
         'P1',
-        'expect() sin matcher encadenado.',
-        'Encadena un matcher, por ejemplo .toBe(...) o .toHaveLength(...).',
+        'expect() with no matcher chained.',
+        'Chain a matcher, e.g. .toBe(...) or .toHaveLength(...).',
       ),
     );
   });
@@ -208,10 +208,10 @@ export const tautology: Rule = (context) => {
       finding(
         context,
         node,
-        'tautologia',
+        'tautology',
         'P1',
-        `expect(${actual.getText(context.source)}) comparado consigo mismo.`,
-        'Compara el resultado del código bajo prueba, no un literal contra sí mismo.',
+        `expect(${actual.getText(context.source)}) compared against itself.`,
+        'Compare the result of the code under test, not a literal against itself.',
       ),
     );
   });
@@ -246,10 +246,10 @@ export const skippedTest: Rule = (context) => {
       finding(
         context,
         node,
-        'prueba-omitida',
+        'skipped-test',
         'P3',
-        `"${titleOf(node)}" está omitida.`,
-        'Reactívala o bórrala. Una prueba desactivada da la ilusión de cobertura.',
+        `"${titleOf(node)}" is skipped.`,
+        'Re-enable it or delete it. A disabled test gives the illusion of coverage.',
       ),
     );
   });
@@ -270,10 +270,10 @@ export const focusedTest: Rule = (context) => {
       finding(
         context,
         node,
-        'prueba-enfocada',
+        'focused-test',
         'P1',
-        `"${titleOf(node)}" usa .only: el resto de la suite no se ejecuta.`,
-        'Quita .only antes de integrar. En CI esto silencia el resto de las pruebas.',
+        `"${titleOf(node)}" uses .only: the rest of the suite doesn't run.`,
+        'Remove .only before merging. In CI this silences the rest of the tests.',
       ),
     );
   });
@@ -308,10 +308,10 @@ export const missingAwait: Rule = (context) => {
       finding(
         context,
         node,
-        'await-faltante',
+        'missing-await',
         'P1',
-        `expect(...).${asyncExpect} sin await: la prueba termina antes de comprobar nada.`,
-        'Antepón await, o devuelve la expresión con return.',
+        `expect(...).${asyncExpect} with no await: the test ends before checking anything.`,
+        'Add await, or return the expression.',
       ),
     );
   });

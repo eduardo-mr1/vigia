@@ -266,17 +266,17 @@ export function orphanNegativeAssertions(
 
     const orphan = confidence === 'inexistente';
     findings.push({
-      rule: 'assercion-negativa-huerfana',
+      rule: 'orphan-negative-assertion',
       severity: orphan ? 'P1' : 'P2',
       file,
       line: assertion.line,
       column: assertion.column,
       message: orphan
-        ? `"${assertion.id}" no aparece en el código fuente: esta aserción negativa pasa siempre.`
-        : `"${assertion.id}" solo coincide parcialmente con un identificador construido: puede que el código nunca lo produzca.`,
+        ? `"${assertion.id}" doesn't appear anywhere in the source: this negative assertion always passes.`
+        : `"${assertion.id}" only partially matches a constructed identifier: the code may never produce it.`,
       hint: orphan
-        ? `Verifica el identificador, o asegúrate de que el código pueda generar "${assertion.id}" en algún estado.`
-        : 'Comprueba qué valores toma realmente la interpolación, o afirma sobre datos visibles en vez de sobre la ausencia de un elemento.',
+        ? `Check the identifier, or make sure the code can generate "${assertion.id}" in some state.`
+        : 'Check what values the interpolation actually takes, or assert on visible data instead of the absence of an element.',
     });
   }
 

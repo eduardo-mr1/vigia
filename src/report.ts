@@ -11,10 +11,10 @@ const SEVERITY_ORDER: Record<Severity, number> = { P1: 0, P2: 1, P3: 2 };
 
 export function renderReport(result: AnalysisResult): string {
   const { findings, filesAnalyzed } = result;
-  const plural = filesAnalyzed === 1 ? 'archivo' : 'archivos';
+  const plural = filesAnalyzed === 1 ? 'file' : 'files';
 
   if (findings.length === 0) {
-    return `## Vigía\n\nSin hallazgos en ${filesAnalyzed} ${plural} de prueba.`;
+    return `## Vigía\n\nNo findings in ${filesAnalyzed} test ${plural}.`;
   }
 
   const counts = countBySeverity(findings);
@@ -26,14 +26,14 @@ export function renderReport(result: AnalysisResult): string {
   const lines = [
     '## Vigía',
     '',
-    `${findings.length} ${findings.length === 1 ? 'hallazgo' : 'hallazgos'} en ${filesAnalyzed} ${plural}: ${summary}`,
+    `${findings.length} ${findings.length === 1 ? 'finding' : 'findings'} in ${filesAnalyzed} ${plural}: ${summary}`,
     '',
   ];
 
   for (const [file, group] of groupByFile(findings)) {
     lines.push(`### \`${file}\``, '');
     for (const f of group) {
-      lines.push(`- **${f.severity}** · línea ${f.line} · \`${f.rule}\``);
+      lines.push(`- **${f.severity}** · line ${f.line} · \`${f.rule}\``);
       lines.push(`  ${f.message}`);
       lines.push(`  _${f.hint}_`);
     }

@@ -22,7 +22,7 @@ describe('noAssertion', () => {
     );
 
     expect(result).toHaveLength(1);
-    expect(result[0]?.rule).toBe('sin-assercion');
+    expect(result[0]?.rule).toBe('no-assertion');
     expect(result[0]?.message).toContain('suma dos numeros');
   });
 
@@ -79,7 +79,7 @@ describe('expectWithoutMatcher', () => {
   it('detecta expect() suelto', () => {
     const result = findings(`it('a', () => { expect(valor); });`, [expectWithoutMatcher]);
     expect(result).toHaveLength(1);
-    expect(result[0]?.rule).toBe('expect-sin-matcher');
+    expect(result[0]?.rule).toBe('expect-without-matcher');
   });
 
   it('acepta expect con matcher', () => {
@@ -99,7 +99,7 @@ describe('tautology', () => {
   it('detecta expect(true).toBe(true)', () => {
     const result = findings(`it('a', () => { expect(true).toBe(true); });`, [tautology]);
     expect(result).toHaveLength(1);
-    expect(result[0]?.rule).toBe('tautologia');
+    expect(result[0]?.rule).toBe('tautology');
   });
 
   it.each([
@@ -209,7 +209,7 @@ describe('formas poco comunes de declarar pruebas', () => {
 
   it('detecta el título ausente sin romperse', () => {
     const result = findings(`it(nombreDinamico, () => {});`, [noAssertion]);
-    expect(result[0]?.message).toContain('(sin título)');
+    expect(result[0]?.message).toContain('(untitled)');
   });
 });
 
@@ -224,7 +224,7 @@ describe('missingAwait', () => {
   ])('detecta %s sin await', (assertion) => {
     const result = findings(`it('a', async () => { ${assertion} });`, [missingAwait]);
     expect(result).toHaveLength(1);
-    expect(result[0]?.rule).toBe('await-faltante');
+    expect(result[0]?.rule).toBe('missing-await');
     expect(result[0]?.severity).toBe('P1');
   });
 
@@ -297,7 +297,7 @@ describe('missingAwait en Playwright', () => {
       [missingAwait],
     );
     expect(result).toHaveLength(1);
-    expect(result[0]?.rule).toBe('await-faltante');
+    expect(result[0]?.rule).toBe('missing-await');
   });
 
   it('acepta la versión con await', () => {

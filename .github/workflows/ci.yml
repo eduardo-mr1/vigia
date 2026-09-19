@@ -12,8 +12,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  calidad:
-    name: Calidad
+  quality:
+    name: Quality
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,12 +28,12 @@ jobs:
       - run: npm run test:coverage
       - run: npm run build
 
-  # Vigia se analiza a si misma. Si la herramienta no soporta su propio
-  # criterio, no tiene por que imponerselo a nadie mas.
-  autoanalisis:
-    name: Autoanalisis
+  # Vigía checks itself. If the tool can't meet its own bar, it has no
+  # business imposing it on anyone else.
+  self-check:
+    name: Self-check
     runs-on: ubuntu-latest
-    needs: calidad
+    needs: quality
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

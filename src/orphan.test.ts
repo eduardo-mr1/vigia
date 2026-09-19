@@ -193,7 +193,7 @@ describe('orphanNegativeAssertions', () => {
     );
 
     expect(result).toHaveLength(1);
-    expect(result[0]?.rule).toBe('assercion-negativa-huerfana');
+    expect(result[0]?.rule).toBe('orphan-negative-assertion');
     expect(result[0]?.message).toContain('gasto-monto-9999-duplicado');
     // El prefijo 'gasto-monto-' existe, pero el sufijo '9999-duplicado' no es
     // un valor de interpolacion: se reporta como sospechoso, no como certeza.

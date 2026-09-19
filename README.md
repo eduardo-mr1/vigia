@@ -82,17 +82,17 @@ By default it only analyzes the test files changed in the PR, so it stays fast a
 
 | Input | Default | Description |
 |---|---|---|
-| `ruta` | `.` | Directory to analyze when not limited to the PR's changed files |
-| `solo-cambios` | `true` | Analyze only the test files touched by the PR |
-| `codigo-fuente` | — | Path to your source root. Set this to enable orphan-negative-assertion detection |
-| `fallar-en-p1` | `true` | Fail the job when a P1 finding is present |
-| `comentar` | `true` | Post the report as a sticky PR comment |
+| `path` | `.` | Directory to analyze when not limited to the PR's changed files |
+| `changed-only` | `true` | Analyze only the test files touched by the PR |
+| `source` | — | Path to your source root. Set this to enable orphan-negative-assertion detection |
+| `fail-on-p1` | `true` | Fail the job when a P1 finding is present |
+| `comment` | `true` | Post the report as a sticky PR comment |
 
 ```yaml
       - uses: eduardo-mr1/vigia@v1
         with:
-          codigo-fuente: 'src'
-          fallar-en-p1: 'true'
+          source: 'src'
+          fail-on-p1: 'true'
 ```
 
 You can also run it as a CLI, outside of CI:
@@ -115,7 +115,7 @@ Written in TypeScript. Vigía never executes your tests — it only reads them, 
 
 ## Vigía tests itself
 
-The tool that polices assertions isn't exempt from them: **129 tests across 4 suites**, every rule covered by both a positive and a negative fixture, and a dedicated `autoanálisis` CI job that runs Vigía against its own `src/` on every push.
+The tool that polices assertions isn't exempt from them: **129 tests across 4 suites**, every rule covered by both a positive and a negative fixture, and a dedicated `self-check` CI job that runs Vigía against its own `src/` on every push.
 
 ```bash
 npm test              # 129 tests
@@ -127,14 +127,14 @@ node dist/cli.js src  # Vigía, on Vigía
 ```
 $ node dist/cli.js ejemplo
 
-ejemplo/carrito.test.ts:8:3   P1  sin-assercion       La prueba "calcula el total" no contiene ninguna aserción.
-ejemplo/carrito.test.ts:14:5  P1  expect-sin-matcher  expect() sin matcher encadenado.
-ejemplo/carrito.test.ts:18:5  P1  tautologia          expect(true) comparado consigo mismo.
-ejemplo/carrito.test.ts:21:3  P3  prueba-omitida      "valida el cupón vencido" está omitida.
-ejemplo/carrito.test.ts:25:3  P1  prueba-enfocada     "suma con impuestos" usa .only: el resto de la suite no se ejecuta.
-ejemplo/carrito.test.ts:31:5  P1  await-faltante      expect(...).rejects sin await: la prueba termina antes de comprobar nada.
+ejemplo/carrito.test.ts:8:3   P1  no-assertion            Test "calculates the total" contains no assertion.
+ejemplo/carrito.test.ts:14:5  P1  expect-without-matcher  expect() with no matcher chained.
+ejemplo/carrito.test.ts:18:5  P1  tautology               expect(true) compared against itself.
+ejemplo/carrito.test.ts:21:3  P3  skipped-test            "validates an expired coupon" is skipped.
+ejemplo/carrito.test.ts:25:3  P1  focused-test            "adds tax" uses .only: the rest of the suite doesn't run.
+ejemplo/carrito.test.ts:31:5  P1  missing-await           expect(...).rejects with no await: the test ends before checking anything.
 
-6 hallazgo(s): 5 P1, 0 P2, 1 P3
+6 finding(s): 5 P1, 0 P2, 1 P3
 ```
 
 ---

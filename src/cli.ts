@@ -72,13 +72,13 @@ function main(): void {
   if (format === 'markdown') {
     process.stdout.write(`${renderReport(result)}\n`);
   } else if (result.findings.length === 0) {
-    process.stdout.write(`Sin hallazgos en ${result.filesAnalyzed} archivo(s).\n`);
+    process.stdout.write(`No findings in ${result.filesAnalyzed} file(s).\n`);
   } else {
     for (const f of result.findings) {
       process.stdout.write(`${f.file}:${f.line}:${f.column}  ${f.severity}  ${f.rule}  ${f.message}\n`);
     }
     const counts = countBySeverity(result.findings);
-    process.stdout.write(`\n${result.findings.length} hallazgo(s): ${counts.P1} P1, ${counts.P2} P2, ${counts.P3} P3\n`);
+    process.stdout.write(`\n${result.findings.length} finding(s): ${counts.P1} P1, ${counts.P2} P2, ${counts.P3} P3\n`);
   }
 
   // Solo los P1 rompen el build. Un P3 informa; hacerlo bloqueante enseña a

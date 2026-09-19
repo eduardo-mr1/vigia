@@ -53,7 +53,7 @@ describe('analyzeFiles', () => {
 
     const result = analyzeFiles([flow], { sourceRoot: dir });
     expect(result.findings).toHaveLength(1);
-    expect(result.findings[0]?.rule).toBe('assercion-negativa-huerfana');
+    expect(result.findings[0]?.rule).toBe('orphan-negative-assertion');
   });
 
   // Sin saber que identificadores existen, cualquier hallazgo seria una

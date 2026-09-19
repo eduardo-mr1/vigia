@@ -1,5 +1,5 @@
 name: 'Vigía - Assertion Guard'
-description: 'Detecta pruebas que pasan sin verificar nada y lo comenta en el Pull Request.'
+description: 'Flags tests that pass without verifying anything, and comments the finding on the Pull Request.'
 author: 'Eduardo Maytorena'
 
 branding:
@@ -7,42 +7,42 @@ branding:
   color: 'blue'
 
 inputs:
-  ruta:
-    description: 'Directorio a analizar cuando no se limita a los archivos del PR.'
+  path:
+    description: 'Directory to analyze when not limited to the files changed in the PR.'
     required: false
     default: '.'
-  solo-cambios:
-    description: 'Analizar únicamente los archivos de prueba que toca el PR.'
+  changed-only:
+    description: 'Only analyze the test files touched by the PR.'
     required: false
     default: 'true'
-  codigo-fuente:
-    description: 'Raíz del código fuente. Habilita la detección de aserciones negativas huérfanas.'
+  source:
+    description: 'Root of the source code. Enables detection of orphan negative assertions.'
     required: false
     default: ''
-  fallar-en-p1:
-    description: 'Terminar el job con error si hay hallazgos P1.'
+  fail-on-p1:
+    description: 'Fail the job when there are P1 findings.'
     required: false
     default: 'true'
-  comentar:
-    description: 'Publicar el resultado como comentario en el PR.'
+  comment:
+    description: 'Post the result as a comment on the PR.'
     required: false
     default: 'true'
 
 outputs:
-  hallazgos:
-    description: 'Número total de hallazgos.'
-    value: ${{ steps.analizar.outputs.hallazgos }}
+  findings:
+    description: 'Total number of findings.'
+    value: ${{ steps.analyze.outputs.findings }}
   p1:
-    description: 'Número de hallazgos P1.'
-    value: ${{ steps.analizar.outputs.p1 }}
+    description: 'Number of P1 findings.'
+    value: ${{ steps.analyze.outputs.p1 }}
 
 runs:
   using: 'composite'
   steps:
-    # dist/ no se versiona: es un artefacto. La accion lo compila la primera
-    # vez que se usa, dentro de su propio directorio, sin tocar el repo que la
-    # invoca. Cuesta unos segundos y evita commitear codigo generado.
-    - name: Preparar Vigía
+    # dist/ isn't versioned: it's a build artifact. The action compiles it the
+    # first time it's used, inside its own directory, without touching the
+    # calling repo. Costs a few seconds and avoids committing generated code.
+    - name: Prepare Vigía
       shell: bash
       run: |
         if [ ! -f "${{ github.action_path }}/dist/cli.js" ]; then
@@ -51,52 +51,52 @@ runs:
           npm run build
         fi
 
-    - name: Determinar archivos a analizar
-      id: archivos
+    - name: Determine files to analyze
+      id: files
       shell: bash
       run: |
-        if [ "${{ inputs.solo-cambios }}" = "true" ] && [ -n "$GITHUB_BASE_REF" ]; then
+        if [ "${{ inputs.changed-only }}" = "true" ] && [ -n "$GITHUB_BASE_REF" ]; then
           git fetch --depth=1 origin "$GITHUB_BASE_REF"
-          CAMBIOS=$(git diff --name-only --diff-filter=d "origin/$GITHUB_BASE_REF"...HEAD | grep -E '\.(test|spec)\.(ts|tsx|js|jsx)$|\.ya?ml$' || true)
-          echo "lista<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$CAMBIOS" >> "$GITHUB_OUTPUT"
+          CHANGED=$(git diff --name-only --diff-filter=d "origin/$GITHUB_BASE_REF"...HEAD | grep -E '\.(test|spec)\.(ts|tsx|js|jsx)$|\.ya?ml$' || true)
+          echo "list<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$CHANGED" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
         else
-          echo "lista=" >> "$GITHUB_OUTPUT"
+          echo "list=" >> "$GITHUB_OUTPUT"
         fi
 
-    - name: Analizar
-      id: analizar
+    - name: Analyze
+      id: analyze
       shell: bash
       run: |
-        LISTA="${{ steps.archivos.outputs.lista }}"
+        LIST="${{ steps.files.outputs.list }}"
         SRC=""
-        if [ -n "${{ inputs.codigo-fuente }}" ]; then SRC="--src ${{ inputs.codigo-fuente }}"; fi
+        if [ -n "${{ inputs.source }}" ]; then SRC="--src ${{ inputs.source }}"; fi
 
-        if [ -n "$LISTA" ]; then
-          node "${{ github.action_path }}/dist/cli.js" --format markdown $SRC --files $LISTA > vigia-reporte.md || true
+        if [ -n "$LIST" ]; then
+          node "${{ github.action_path }}/dist/cli.js" --format markdown $SRC --files $LIST > vigia-report.md || true
         else
-          node "${{ github.action_path }}/dist/cli.js" "${{ inputs.ruta }}" $SRC --format markdown > vigia-reporte.md || true
+          node "${{ github.action_path }}/dist/cli.js" "${{ inputs.path }}" $SRC --format markdown > vigia-report.md || true
         fi
-        cat vigia-reporte.md
+        cat vigia-report.md
 
-    - name: Comentar en el PR
-      if: inputs.comentar == 'true' && github.event_name == 'pull_request'
+    - name: Comment on the PR
+      if: inputs.comment == 'true' && github.event_name == 'pull_request'
       uses: marocchino/sticky-pull-request-comment@v2
       with:
         header: vigia
-        path: vigia-reporte.md
+        path: vigia-report.md
 
-    - name: Fallar si hay P1
-      if: inputs.fallar-en-p1 == 'true'
+    - name: Fail if there are P1 findings
+      if: inputs.fail-on-p1 == 'true'
       shell: bash
       run: |
-        LISTA="${{ steps.archivos.outputs.lista }}"
+        LIST="${{ steps.files.outputs.list }}"
         SRC=""
-        if [ -n "${{ inputs.codigo-fuente }}" ]; then SRC="--src ${{ inputs.codigo-fuente }}"; fi
+        if [ -n "${{ inputs.source }}" ]; then SRC="--src ${{ inputs.source }}"; fi
 
-        if [ -n "$LISTA" ]; then
-          node "${{ github.action_path }}/dist/cli.js" $SRC --files $LISTA
+        if [ -n "$LIST" ]; then
+          node "${{ github.action_path }}/dist/cli.js" $SRC --files $LIST
         else
-          node "${{ github.action_path }}/dist/cli.js" "${{ inputs.ruta }}" $SRC
+          node "${{ github.action_path }}/dist/cli.js" "${{ inputs.path }}" $SRC
         fi
