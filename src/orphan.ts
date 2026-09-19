@@ -1,14 +1,14 @@
 /**
- * Aserciones negativas sobre identificadores que no existen.
+ * Negative assertions on identifiers that don't exist.
  *
- * El caso que originó esta herramienta: un flujo E2E hacía
- * `assertNotVisible` sobre un identificador que la app nunca genera. Una
- * aserción negativa sobre algo imposible pasa siempre. La prueba estuvo
- * semanas en verde sin comprobar nada.
+ * The case that started this tool: an E2E flow did `assertNotVisible` on
+ * an identifier the app never generates. A negative assertion on something
+ * impossible always passes. The test stayed green for weeks without
+ * checking anything.
  *
- * La detección cruza dos lados: qué identificadores puede producir el código
- * fuente, y cuáles esperan las pruebas. Lo que aparece solo en las pruebas es
- * sospechoso.
+ * Detection cross-references two sides: which identifiers the source code
+ * can produce, and which ones the tests expect. Whatever shows up only in
+ * the tests is suspect.
  */
 
 import fs from 'node:fs';
@@ -17,11 +17,11 @@ import ts from 'typescript';
 
 import type { Finding } from './types';
 
-/** Identificadores que el código fuente puede producir. */
+/** Identifiers the source code can produce. */
 export interface KnownIds {
-  /** Literales exactos: testID="fab-agregar". */
+  /** Exact literals: testID="add-fab". */
   readonly exact: ReadonlySet<string>;
-  /** Prefijos de identificadores construidos: testID={`gasto-${index}`}. */
+  /** Prefixes of constructed identifiers: testID={`expense-${index}`}. */
   readonly prefixes: readonly string[];
 }
 
@@ -29,12 +29,12 @@ const SOURCE_FILE = /\.(ts|tsx|js|jsx)$/;
 const TEST_FILE = /\.(test|spec)\.(ts|tsx|js|jsx)$/;
 const IGNORED_DIRS = new Set(['node_modules', 'dist', 'coverage', '.git', 'build']);
 
-// testID="algo" | testId='algo' | data-testid="algo"
+// testID="something" | testId='something' | data-testid="something"
 const LITERAL_ID = /(?:testID|testId|data-testid)\s*=\s*["']([^"']+)["']/g;
-// testID={`prefijo-${...}`} — el prefijo es lo único conocido de antemano.
+// testID={`prefix-${...}`} — the prefix is the only part known ahead of time.
 const TEMPLATE_ID = /(?:testID|testId)\s*=\s*\{\s*`([^`$]*)\$\{/g;
-// accessibilityLabel y otros identificadores no se consideran: son texto para
-// el usuario, no anclas de prueba.
+// accessibilityLabel and other identifiers aren't considered: they're text
+// for the user, not test anchors.
 
 export function collectKnownIds(root: string): KnownIds {
   const exact = new Set<string>();
@@ -59,7 +59,7 @@ export function collectKnownIds(root: string): KnownIds {
   return { exact, prefixes };
 }
 
-/** Archivos de código fuente, excluidos los de prueba. */
+/** Source code files, excluding test files. */
 export function collectSourceFiles(root: string): string[] {
   const found: string[] = [];
 
@@ -85,36 +85,36 @@ export function collectSourceFiles(root: string): string[] {
   return found.sort();
 }
 
-/** Qué tan seguro es que el código pueda producir un identificador. */
-export type Confidence = 'exacto' | 'probable' | 'inexistente';
+/** How confident we are that the code can produce an identifier. */
+export type Confidence = 'exact' | 'probable' | 'nonexistent';
 
 /**
- * Un identificador construido (`gasto-${index}`) solo revela su prefijo, así
- * que la coincidencia por prefijo es ambigua a propósito.
+ * A constructed identifier (`expense-${index}`) only reveals its prefix, so
+ * matching by prefix is deliberately ambiguous.
  *
- * El criterio: una interpolación produce UN valor —un índice, un id, una
- * clave—, no una estructura. Si lo que sigue al prefijo trae más separadores,
- * es más probable que sea un identificador inventado que un valor real.
+ * The criterion: an interpolation produces ONE value — an index, an id, a
+ * key — not a structure. If what follows the prefix carries more separators,
+ * it's more likely to be a made-up identifier than a real value.
  *
- * Es exactamente el caso que originó la herramienta: `gasto-monto-` existía
- * como prefijo, y `gasto-monto-9999-duplicado` se colaba como válido.
+ * It's exactly the case that started the tool: `expense-amount-` existed as
+ * a prefix, and `expense-amount-9999-duplicate` slipped through as valid.
  */
 export function classify(id: string, known: KnownIds): Confidence {
-  if (known.exact.has(id)) return 'exacto';
+  if (known.exact.has(id)) return 'exact';
 
   const matching = known.prefixes.filter((p) => p !== '' && id.startsWith(p));
-  if (matching.length === 0) return 'inexistente';
+  if (matching.length === 0) return 'nonexistent';
 
-  // El sufijo más corto es el que corresponde al prefijo más específico.
+  // The shortest suffix is the one that matches the most specific prefix.
   const suffix = matching
     .map((p) => id.slice(p.length))
     .reduce((shortest, current) => (current.length < shortest.length ? current : shortest));
 
-  return /^[A-Za-z0-9_]+$/.test(suffix) ? 'exacto' : 'probable';
+  return /^[A-Za-z0-9_]+$/.test(suffix) ? 'exact' : 'probable';
 }
 
 export function isKnown(id: string, known: KnownIds): boolean {
-  return classify(id, known) === 'exacto';
+  return classify(id, known) === 'exact';
 }
 
 export interface NegativeAssertion {
@@ -125,10 +125,10 @@ export interface NegativeAssertion {
 }
 
 /**
- * Aserciones negativas en un flujo de Maestro (YAML).
+ * Negative assertions in a Maestro (YAML) flow.
  *
- * Aquí sí se analiza el texto línea a línea: YAML no tiene un AST a mano y su
- * estructura es lo bastante plana para hacerlo sin ambigüedad.
+ * Here the text really is analyzed line by line: YAML has no AST at hand,
+ * and its structure is flat enough to do this unambiguously.
  */
 export function findFlowAssertions(code: string): NegativeAssertion[] {
   const results: NegativeAssertion[] = [];
@@ -170,11 +170,11 @@ const NEGATED_MATCHERS = new Set(['toBeVisible', 'toBeTruthy', 'toBeOnTheScreen'
 const QUERY_FNS = new Set(['queryByTestId', 'queryAllByTestId']);
 
 /**
- * Aserciones negativas en código TypeScript, con el AST.
+ * Negative assertions in TypeScript code, using the AST.
  *
- * El regex equivalente marcaba código escrito dentro de una cadena de texto —
- * el propio archivo de pruebas de esta regla lo delató en el autoanálisis. Es
- * el mismo motivo por el que las demás reglas ya usaban el árbol sintáctico.
+ * The regex equivalent flagged code written inside a string literal — this
+ * rule's own test file gave it away during self-analysis. It's the same
+ * reason the other rules already used the syntax tree.
  */
 export function findCodeAssertions(file: string, code: string): NegativeAssertion[] {
   const source = ts.createSourceFile(file, code, ts.ScriptTarget.Latest, true);
@@ -187,7 +187,7 @@ export function findCodeAssertions(file: string, code: string): NegativeAssertio
       const negated = NEGATED_MATCHERS.has(matcher);
 
       if (negative || negated) {
-        // Con matcher negado hay un `.not` intermedio que hay que atravesar.
+        // With a negated matcher there's an intermediate `.not` to walk through.
         let receiver: ts.Expression = node.expression.expression;
         if (
           negated &&
@@ -220,7 +220,7 @@ export function findCodeAssertions(file: string, code: string): NegativeAssertio
   return results;
 }
 
-/** Extrae el identificador de `expect(queryByTestId('x'))`, si es esa forma. */
+/** Extracts the identifier from `expect(queryByTestId('x'))`, if that's the shape. */
 function testIdFromExpect(node: ts.Expression): string | null {
   if (!ts.isCallExpression(node)) return null;
   if (!ts.isIdentifier(node.expression) || node.expression.text !== 'expect') return null;
@@ -243,7 +243,7 @@ function testIdFromExpect(node: ts.Expression): string | null {
   return argument && ts.isStringLiteralLike(argument) ? argument.text : null;
 }
 
-/** Aserciones negativas de un archivo, según su tipo. */
+/** Negative assertions in a file, based on its type. */
 export function findNegativeAssertions(file: string, code: string): NegativeAssertion[] {
   const results = /\.ya?ml$/.test(file)
     ? findFlowAssertions(code)
@@ -252,7 +252,7 @@ export function findNegativeAssertions(file: string, code: string): NegativeAsse
   return [...results].sort((a, b) => a.line - b.line || a.column - b.column);
 }
 
-/** Reporta las aserciones negativas cuyo identificador nadie puede producir. */
+/** Reports the negative assertions whose identifier nobody can produce. */
 export function orphanNegativeAssertions(
   file: string,
   code: string,
@@ -262,9 +262,9 @@ export function orphanNegativeAssertions(
 
   for (const assertion of findNegativeAssertions(file, code)) {
     const confidence = classify(assertion.id, known);
-    if (confidence === 'exacto') continue;
+    if (confidence === 'exact') continue;
 
-    const orphan = confidence === 'inexistente';
+    const orphan = confidence === 'nonexistent';
     findings.push({
       rule: 'orphan-negative-assertion',
       severity: orphan ? 'P1' : 'P2',

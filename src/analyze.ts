@@ -1,5 +1,5 @@
 /**
- * Recorre archivos de prueba y aplica las reglas.
+ * Walks test files and applies the rules.
  */
 
 import fs from 'node:fs';
@@ -18,7 +18,7 @@ export function isTestFile(file: string): boolean {
   return TEST_FILE.test(file);
 }
 
-/** Flujos E2E en YAML (Maestro). Se analizan solo por aserciones negativas. */
+/** E2E flows in YAML (Maestro). Only analyzed for negative assertions. */
 export function isFlowFile(file: string): boolean {
   return FLOW_FILE.test(file);
 }
@@ -26,15 +26,15 @@ export function isFlowFile(file: string): boolean {
 export interface AnalyzeOptions {
   readonly rules?: readonly Rule[];
   /**
-   * Raíz del código fuente. Con ella se recogen los identificadores que la app
-   * puede producir, para detectar aserciones negativas huérfanas. Sin ella esa
-   * regla no se aplica: sin saber qué identificadores existen, cualquier
-   * hallazgo sería una suposición.
+   * Source code root. With it, the identifiers the app can produce are
+   * collected, to detect orphan negative assertions. Without it, that rule
+   * doesn't apply: without knowing what identifiers exist, any finding
+   * would be a guess.
    */
   readonly sourceRoot?: string;
 }
 
-/** Analiza el contenido de un archivo. Separado del disco para poder probarlo. */
+/** Analyzes a file's contents. Kept separate from disk access so it's testable. */
 export function analyzeSource(file: string, code: string, active: readonly Rule[] = rules): Finding[] {
   const source = ts.createSourceFile(file, code, ts.ScriptTarget.Latest, true);
   const context: RuleContext = { file, source };
@@ -65,14 +65,14 @@ export function analyzeFiles(
     try {
       code = fs.readFileSync(file, 'utf8');
     } catch {
-      // Un archivo borrado en el PR sigue apareciendo en el diff. No es un
-      // error: simplemente ya no hay nada que analizar.
+      // A file deleted in the PR still shows up in the diff. Not an
+      // error: there's simply nothing left to analyze.
       continue;
     }
 
     filesAnalyzed += 1;
-    // Los flujos YAML no tienen AST de TypeScript: solo aplica la regla de
-    // aserciones negativas.
+    // YAML flows have no TypeScript AST: only the negative-assertion rule
+    // applies to them.
     if (test) findings.push(...analyzeSource(file, code, active));
     if (known) findings.push(...orphanNegativeAssertions(file, code, known));
   }
@@ -81,7 +81,7 @@ export function analyzeFiles(
   return { findings, filesAnalyzed };
 }
 
-/** Lista los archivos de prueba y los flujos E2E bajo un directorio. */
+/** Lists the test files and E2E flows under a directory. */
 export function collectTestFiles(root: string): string[] {
   const found: string[] = [];
 

@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * Uso:
- *   vigia [ruta]              analiza las pruebas y flujos bajo esa ruta
- *   vigia --files a.ts b.ts   analiza archivos concretos (los del PR)
- *   vigia --src ./src         raíz del código, habilita la deteccion de
- *                             aserciones negativas huerfanas
- *   vigia --format markdown   emite el comentario listo para publicar
+ * Usage:
+ *   vigia [path]               analyzes the tests and flows under that path
+ *   vigia --files a.ts b.ts    analyzes specific files (the PR's own)
+ *   vigia --src ./src          source root, enables detection of orphan
+ *                              negative assertions
+ *   vigia --format markdown    emits the comment ready to post
  *
- * Código de salida 1 si hay hallazgos P1: es lo que hace fallar el job de CI.
+ * Exit code 1 when there's a P1 finding: that's what fails the CI job.
  */
 
 import { analyzeFiles, collectTestFiles } from './analyze';
@@ -21,9 +21,9 @@ interface Args {
 }
 
 /**
- * Recorre por posición y no por valor: `--src ./demo ./demo` repite el mismo
- * texto en dos papeles distintos, y filtrar por valor descartaba el
- * posicional.
+ * Walked by position, not by value: `--src ./demo ./demo` repeats the same
+ * text in two different roles, and filtering by value would have dropped
+ * the positional one.
  */
 function parseArgs(argv: readonly string[]): Args {
   const files: string[] = [];
@@ -81,8 +81,8 @@ function main(): void {
     process.stdout.write(`\n${result.findings.length} finding(s): ${counts.P1} P1, ${counts.P2} P2, ${counts.P3} P3\n`);
   }
 
-  // Solo los P1 rompen el build. Un P3 informa; hacerlo bloqueante enseña a
-  // ignorar la herramienta.
+  // Only P1s break the build. A P3 just informs; making it blocking teaches
+  // people to ignore the tool.
   process.exitCode = countBySeverity(result.findings).P1 > 0 ? 1 : 0;
 }
 

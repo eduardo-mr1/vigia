@@ -1,13 +1,13 @@
 /**
- * Reglas que detectan pruebas incapaces de fallar.
+ * Rules that detect tests incapable of failing.
  *
- * Todas parten del mismo principio: una prueba que no puede fallar es peor que
- * ninguna prueba, porque ocupa el lugar de la que sí verificaría algo y aporta
- * confianza que nadie gana.
+ * They all start from the same principle: a test that can't fail is worse
+ * than no test at all, because it occupies the place of one that would
+ * actually verify something and earns confidence nobody has won.
  *
- * El análisis usa el AST de TypeScript en lugar de expresiones regulares: un
- * `expect` dentro de un comentario o de una cadena no es una aserción, y solo
- * el árbol sintáctico distingue la diferencia.
+ * The analysis uses the TypeScript AST instead of regular expressions: an
+ * `expect` inside a comment or a string isn't an assertion, and only the
+ * syntax tree tells the difference.
  */
 
 import ts from 'typescript';
@@ -24,7 +24,7 @@ export interface RuleContext {
 
 export type Rule = (context: RuleContext) => Finding[];
 
-/** Convierte una posición del AST en línea y columna 1-based. */
+/** Converts an AST position into a 1-based line and column. */
 function locate(source: ts.SourceFile, node: ts.Node): { line: number; column: number } {
   const { line, character } = source.getLineAndCharacterOfPosition(node.getStart(source));
   return { line: line + 1, column: character + 1 };
@@ -41,7 +41,7 @@ function finding(
   return { rule, severity, file: context.file, ...locate(context.source, node), message, hint };
 }
 
-/** Nombre invocado, siguiendo cadenas como `it.each(...)` o `describe.skip`. */
+/** Invoked name, following chains like `it.each(...)` or `describe.skip`. */
 function calleeName(expression: ts.Expression): string | null {
   if (ts.isIdentifier(expression)) return expression.text;
   if (ts.isPropertyAccessExpression(expression)) return calleeName(expression.expression);
@@ -50,7 +50,7 @@ function calleeName(expression: ts.Expression): string | null {
   return null;
 }
 
-/** Modificadores encadenados: `it.skip.each` devuelve ['skip', 'each']. */
+/** Chained modifiers: `it.skip.each` returns ['skip', 'each']. */
 function modifiers(expression: ts.Expression): string[] {
   if (ts.isPropertyAccessExpression(expression)) {
     return [...modifiers(expression.expression), expression.name.text];
@@ -92,15 +92,15 @@ function walk(node: ts.Node, visit: (node: ts.Node) => void): void {
 }
 
 /**
- * Formas de aserción reconocidas, más allá de `expect`.
+ * Assertion forms recognized beyond `expect`.
  *
- * Cypress asierta con `.should()` y `.and()`; Chai también ofrece `assert.*`.
- * Sin esto, toda prueba de Cypress se reportaría como "sin aserción": un falso
- * positivo que haría inservible la herramienta en esos proyectos.
+ * Cypress asserts with `.should()` and `.and()`; Chai also offers `assert.*`.
+ * Without this, every Cypress test would be reported as "no assertion": a
+ * false positive that would make the tool unusable on those projects.
  */
 const ASSERTION_METHODS = new Set(['should', 'and']);
 
-/** ¿El nodo contiene al menos una aserción, en cualquiera de sus formas? */
+/** Does the node contain at least one assertion, in any of its forms? */
 function containsAssertion(node: ts.Node): boolean {
   let found = false;
 
@@ -114,12 +114,12 @@ function containsAssertion(node: ts.Node): boolean {
     }
 
     if (ts.isPropertyAccessExpression(callee)) {
-      // .should(...) / .and(...) de Cypress
+      // .should(...) / .and(...) from Cypress
       if (ASSERTION_METHODS.has(callee.name.text)) {
         found = true;
         return;
       }
-      // assert.equal(...) y demás de Chai
+      // assert.equal(...) and the rest, from Chai
       if (ts.isIdentifier(callee.expression) && callee.expression.text === 'assert') {
         found = true;
       }
@@ -129,9 +129,9 @@ function containsAssertion(node: ts.Node): boolean {
   return found;
 }
 
-// ---------------------------------------------------------------- reglas
+// ---------------------------------------------------------------- rules
 
-/** Una prueba sin `expect` pasa siempre: no verifica nada. */
+/** A test with no `expect` always passes: it verifies nothing. */
 export const noAssertion: Rule = (context) => {
   const findings: Finding[] = [];
 
@@ -155,7 +155,7 @@ export const noAssertion: Rule = (context) => {
   return findings;
 };
 
-/** `expect(x)` sin matcher encadenado no comprueba nada. */
+/** `expect(x)` with no matcher chained checks nothing. */
 export const expectWithoutMatcher: Rule = (context) => {
   const findings: Finding[] = [];
 
@@ -164,8 +164,8 @@ export const expectWithoutMatcher: Rule = (context) => {
     const { expression } = node;
     if (!ts.isCallExpression(expression)) return;
     if (calleeName(expression.expression) !== 'expect') return;
-    // Un expect util siempre aparece dentro de un acceso a propiedad
-    // (expect(x).toBe), nunca como sentencia suelta.
+    // A useful expect always shows up inside a property access
+    // (expect(x).toBe), never as a bare statement.
     if (!ts.isIdentifier(expression.expression)) return;
 
     findings.push(
@@ -183,7 +183,7 @@ export const expectWithoutMatcher: Rule = (context) => {
   return findings;
 };
 
-/** Comparar un literal consigo mismo comprueba el lenguaje, no el código. */
+/** Comparing a literal against itself checks the language, not the code. */
 export const tautology: Rule = (context) => {
   const findings: Finding[] = [];
 
@@ -229,7 +229,7 @@ function isLiteral(node: ts.Node): boolean {
   );
 }
 
-/** Una prueba omitida no protege nada, y se olvida. */
+/** A skipped test protects nothing, and gets forgotten. */
 export const skippedTest: Rule = (context) => {
   const findings: Finding[] = [];
 
@@ -257,7 +257,7 @@ export const skippedTest: Rule = (context) => {
   return findings;
 };
 
-/** `it.only` deja fuera al resto de la suite sin que nadie lo note en CI. */
+/** `it.only` leaves the rest of the suite out without anyone noticing in CI. */
 export const focusedTest: Rule = (context) => {
   const findings: Finding[] = [];
 
@@ -284,15 +284,16 @@ export const focusedTest: Rule = (context) => {
 
 
 /**
- * Una aserción asíncrona sin `await` no se comprueba.
+ * An async assertion with no `await` never gets checked.
  *
- * `expect(promesa).rejects.toThrow()` devuelve una promesa. Sin `await` ni
- * `return`, la prueba termina antes de que se resuelva y el fallo se pierde —
- * o peor, aparece en otra prueba, atribuido al caso equivocado.
+ * `expect(promise).rejects.toThrow()` returns a promise. Without `await` or
+ * `return`, the test ends before it settles and the failure is lost — or
+ * worse, it surfaces in a different test, blamed on the wrong case.
  *
- * Es el defecto más común en suites asíncronas y el más difícil de ver leyendo:
- * la línea parece completa. Jest a veces avisa y a veces no, según la versión
- * y según si otra prueba absorbe el rechazo.
+ * It's the most common defect in async suites and the hardest to spot by
+ * reading: the line looks complete. Jest sometimes warns and sometimes
+ * doesn't, depending on the version and on whether another test absorbs
+ * the rejection.
  */
 export const missingAwait: Rule = (context) => {
   const findings: Finding[] = [];
@@ -322,12 +323,13 @@ export const missingAwait: Rule = (context) => {
 const ASYNC_MODIFIERS = new Set(['resolves', 'rejects']);
 
 /**
- * Matchers de Playwright que esperan al elemento y devuelven una promesa.
+ * Playwright matchers that wait for the element and return a promise.
  *
- * En Playwright TODA aserción sobre un locator es asíncrona: reintenta hasta
- * que se cumple o se agota el tiempo. Sin `await`, la aserción se descarta y
- * la prueba pasa sin haber comprobado nada — el mismo defecto que con
- * `.rejects`, pero mucho más frecuente porque la línea se ve completa.
+ * In Playwright EVERY assertion on a locator is asynchronous: it retries
+ * until it passes or times out. Without `await`, the assertion gets
+ * discarded and the test passes without having checked anything — the same
+ * defect as with `.rejects`, but far more frequent because the line looks
+ * complete.
  */
 const PLAYWRIGHT_MATCHERS = new Set([
   'toBeVisible',
@@ -356,7 +358,7 @@ const PLAYWRIGHT_MATCHERS = new Set([
   'toBeOK',
 ]);
 
-/** ¿El archivo importa Playwright? Solo entonces sus matchers son asíncronos. */
+/** Does the file import Playwright? Only then are its matchers asynchronous. */
 function usesPlaywright(source: ts.SourceFile): boolean {
   return source.statements.some(
     (statement) =>
@@ -367,17 +369,17 @@ function usesPlaywright(source: ts.SourceFile): boolean {
 }
 
 /**
- * Devuelve el modificador asíncrono (`resolves` / `rejects`) de una expresión
- * que arranca en `expect(...)`, o null si no es esa forma.
+ * Returns the async modifier (`resolves` / `rejects`) of an expression that
+ * starts at `expect(...)`, or null if it isn't that shape.
  *
- * Solo se inspecciona la expresión desnuda: si el nodo fuera `await ...` o
- * `return ...`, no sería un ExpressionStatement con esta forma.
+ * Only the bare expression is inspected: if the node were `await ...` or
+ * `return ...`, it wouldn't be an ExpressionStatement with this shape.
  */
 function findAsyncExpect(expression: ts.Expression, playwright: boolean): string | null {
   let current: ts.Node = expression;
   let modifier: string | null = null;
 
-  // Se recorre la cadena hacia la raíz: expect(x).rejects.toThrow()
+  // Walked from the chain back to its root: expect(x).rejects.toThrow()
   while (ts.isCallExpression(current) || ts.isPropertyAccessExpression(current)) {
     if (ts.isPropertyAccessExpression(current)) {
       const name = current.name.text;

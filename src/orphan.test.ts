@@ -91,12 +91,12 @@ describe('isKnown', () => {
 
 describe('classify', () => {
   it('un literal declarado es exacto', () => {
-    expect(classify('fab-agregar', known(['fab-agregar']))).toBe('exacto');
+    expect(classify('fab-agregar', known(['fab-agregar']))).toBe('exact');
   });
 
   it('un sufijo simple sobre un prefijo construido es exacto', () => {
-    expect(classify('gasto-42', known([], ['gasto-']))).toBe('exacto');
-    expect(classify('categoria-comida', known([], ['categoria-']))).toBe('exacto');
+    expect(classify('gasto-42', known([], ['gasto-']))).toBe('exact');
+    expect(classify('categoria-comida', known([], ['categoria-']))).toBe('exact');
   });
 
   // El caso que originó la herramienta.
@@ -107,13 +107,13 @@ describe('classify', () => {
   });
 
   it('sin coincidencia alguna es inexistente', () => {
-    expect(classify('inventado', known(['real'], ['gasto-']))).toBe('inexistente');
+    expect(classify('inventado', known(['real'], ['gasto-']))).toBe('nonexistent');
   });
 
   it('usa el prefijo más específico cuando varios coinciden', () => {
     // 'gasto-monto-7' encaja con 'gasto-' y con 'gasto-monto-'; el segundo deja
     // el sufijo '7', que sí es un valor de interpolacion.
-    expect(classify('gasto-monto-7', known([], ['gasto-', 'gasto-monto-']))).toBe('exacto');
+    expect(classify('gasto-monto-7', known([], ['gasto-', 'gasto-monto-']))).toBe('exact');
   });
 });
 

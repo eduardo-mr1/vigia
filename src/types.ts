@@ -1,8 +1,8 @@
 /**
- * Modelo de un hallazgo.
+ * Model of a finding.
  *
- * `line` y `column` son 1-based, como los reporta cualquier editor: un hallazgo
- * que el usuario no puede localizar de un clic no sirve.
+ * `line` and `column` are 1-based, the way any editor reports them: a
+ * finding the user can't jump to with one click isn't useful.
  */
 
 export type Severity = 'P1' | 'P2' | 'P3';
@@ -14,7 +14,7 @@ export interface Finding {
   readonly line: number;
   readonly column: number;
   readonly message: string;
-  /** Qué hacer al respecto. Un hallazgo sin salida es solo un reproche. */
+  /** What to do about it. A finding with no way out is just a complaint. */
   readonly hint: string;
 }
 

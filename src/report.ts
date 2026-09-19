@@ -1,8 +1,8 @@
 /**
- * Formato del comentario que se publica en el Pull Request.
+ * Format of the comment posted on the Pull Request.
  *
- * En Markdown y agrupado por archivo: quien lee un PR revisa archivo por
- * archivo, no regla por regla.
+ * In Markdown and grouped by file: whoever reads a PR reviews it file by
+ * file, not rule by rule.
  */
 
 import type { AnalysisResult, Finding, Severity } from './types';
