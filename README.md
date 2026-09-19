@@ -5,6 +5,7 @@
 A green suite is not the same as a tested codebase. Vigía reads the test files touched by a pull request, finds the ones that can never fail, and comments on the exact line — before the branch merges and the false confidence becomes permanent.
 
 [![CI](https://github.com/eduardo-mr1/vigia/actions/workflows/ci.yml/badge.svg)](https://github.com/eduardo-mr1/vigia/actions)
+[![Marketplace](https://img.shields.io/badge/marketplace-vig%C3%ADa--assertion--guard-blue?logo=github)](https://github.com/marketplace/actions/vigia-assertion-guard)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
