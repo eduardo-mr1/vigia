@@ -1,4 +1,4 @@
-name: 'Vigía'
+name: 'Vigía - Assertion Guard'
 description: 'Detecta pruebas que pasan sin verificar nada y lo comenta en el Pull Request.'
 author: 'Eduardo Maytorena'
 
